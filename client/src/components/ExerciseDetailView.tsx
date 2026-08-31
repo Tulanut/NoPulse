@@ -72,8 +72,8 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
 
   // Form State
   const [date, setDate] = useState<string>(todayStr);
-  const [sets, setSets] = useState<number>(3);
-  const [reps, setReps] = useState<number>(10);
+  const [sets, setSets] = useState<string | number>(3);
+  const [reps, setReps] = useState<string | number>(10);
   const [weight, setWeight] = useState<string>('');
   const [rir, setRir] = useState<number>(2);
   const [selectedProfile, setSelectedProfile] = useState<string | null>(lastUsedProfile || null);
@@ -118,12 +118,14 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const effectiveDate = date.trim() || todayStr;
+    const numSets = parseInt(String(sets), 10);
+    const numReps = parseInt(String(reps), 10);
 
-    if (sets <= 0 || !Number.isInteger(sets)) {
+    if (isNaN(numSets) || numSets <= 0 || !Number.isInteger(numSets)) {
       setError('Sets must be at least 1');
       return;
     }
-    if (reps <= 0 || !Number.isInteger(reps)) {
+    if (isNaN(numReps) || numReps <= 0 || !Number.isInteger(numReps)) {
       setError('Reps must be at least 1');
       return;
     }
@@ -153,8 +155,8 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
       const parsedWeight = weight.trim() !== '' ? parseFloat(weight) : null;
       await onAddWorkout({
         exercise_name: exerciseName,
-        sets,
-        reps,
+        sets: numSets,
+        reps: numReps,
         rir,
         weight: parsedWeight,
         profile: effectiveProfile,
@@ -182,12 +184,14 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
     setIsCreatingProfile(false);
   };
 
-  const adjustValue = (
-    setter: React.Dispatch<React.SetStateAction<number>>,
-    delta: number,
-    min: number = 1
-  ) => {
-    setter((prev) => Math.max(min, prev + delta));
+  const adjustSets = (delta: number) => {
+    const current = parseInt(String(sets), 10) || 1;
+    setSets(Math.max(1, current + delta));
+  };
+
+  const adjustReps = (delta: number) => {
+    const current = parseInt(String(reps), 10) || 1;
+    setReps(Math.max(1, current + delta));
   };
 
   const adjustWeight = (delta: number) => {
@@ -372,9 +376,9 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
               </div>
             )}
 
-            {/* Sets & Reps */}
+            {/* Sets & Reps (Directly Typeable + Stepper Controls) */}
             <div className="grid grid-cols-2 gap-2">
-              {/* Sets */}
+              {/* Sets (Typeable + Steppers) */}
               <div className="space-y-1">
                 <label className="block text-[9px] uppercase tracking-wider text-[#A8A297] font-medium">
                   Sets
@@ -382,17 +386,25 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => adjustValue(setSets, -1, 1)}
+                    onClick={() => adjustSets(-1)}
                     className="w-6 h-6 rounded-full border border-[#383530] bg-[#191816] hover:bg-[#2E2B27] text-xs font-bold flex items-center justify-center active:scale-90"
                   >
                     -
                   </button>
-                  <span className="text-base font-bold text-[#F5F2EB] flex-1 text-center">
-                    {sets}
-                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={sets}
+                    onChange={(e) => setSets(e.target.value)}
+                    onBlur={() => {
+                      if (sets === '' || Number(sets) < 1) setSets(1);
+                    }}
+                    className="w-full bg-transparent text-base font-bold text-[#F5F2EB] text-center focus:outline-none placeholder-[#524E48] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                   <button
                     type="button"
-                    onClick={() => adjustValue(setSets, 1, 1)}
+                    onClick={() => adjustSets(1)}
                     className="w-6 h-6 rounded-full border border-[#383530] bg-[#191816] hover:bg-[#2E2B27] text-xs font-bold flex items-center justify-center active:scale-90"
                   >
                     +
@@ -400,7 +412,7 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
                 </div>
               </div>
 
-              {/* Reps */}
+              {/* Reps (Typeable + Steppers) */}
               <div className="space-y-1">
                 <label className="block text-[9px] uppercase tracking-wider text-[#A8A297] font-medium">
                   Reps
@@ -408,17 +420,25 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => adjustValue(setReps, -1, 1)}
+                    onClick={() => adjustReps(-1)}
                     className="w-6 h-6 rounded-full border border-[#383530] bg-[#191816] hover:bg-[#2E2B27] text-xs font-bold flex items-center justify-center active:scale-90"
                   >
                     -
                   </button>
-                  <span className="text-base font-bold text-[#F5F2EB] flex-1 text-center">
-                    {reps}
-                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={reps}
+                    onChange={(e) => setReps(e.target.value)}
+                    onBlur={() => {
+                      if (reps === '' || Number(reps) < 1) setReps(1);
+                    }}
+                    className="w-full bg-transparent text-base font-bold text-[#F5F2EB] text-center focus:outline-none placeholder-[#524E48] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                   <button
                     type="button"
-                    onClick={() => adjustValue(setReps, 1, 1)}
+                    onClick={() => adjustReps(1)}
                     className="w-6 h-6 rounded-full border border-[#383530] bg-[#191816] hover:bg-[#2E2B27] text-xs font-bold flex items-center justify-center active:scale-90"
                   >
                     +
@@ -427,7 +447,7 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
               </div>
             </div>
 
-            {/* Weight Input */}
+            {/* Weight Input (Typeable + Quick Adjust) */}
             <div className="space-y-1 border-b border-[#383530]/60 pb-2">
               <label className="block text-[9px] uppercase tracking-wider text-[#A8A297] font-medium">
                 Weight (kg)
