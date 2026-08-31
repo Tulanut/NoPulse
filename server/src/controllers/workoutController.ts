@@ -6,17 +6,21 @@ import { Workout, SyncPayload, SyncResponse } from '../types/workout';
 export class WorkoutController {
   public static async getWorkouts(req: Request, res: Response): Promise<void> {
     try {
-      const { exercise, date } = req.query;
+      const { exercise, date, profile } = req.query;
       let workouts = await db.getAllWorkouts();
 
       if (exercise && typeof exercise === 'string') {
-        workouts = workouts.filter(w =>
+        workouts = workouts.filter((w) =>
           w.exercise_name.toLowerCase().includes(exercise.toLowerCase())
         );
       }
 
       if (date && typeof date === 'string') {
-        workouts = workouts.filter(w => w.date === date);
+        workouts = workouts.filter((w) => w.date === date);
+      }
+
+      if (profile && typeof profile === 'string') {
+        workouts = workouts.filter((w) => w.profile === profile);
       }
 
       res.json({
@@ -32,7 +36,7 @@ export class WorkoutController {
 
   public static async createWorkout(req: Request, res: Response): Promise<void> {
     try {
-      const { exercise_name, sets, reps, rir, weight, date, notes } = req.body;
+      const { exercise_name, sets, reps, rir, weight, profile, date, notes } = req.body;
 
       if (!exercise_name || typeof exercise_name !== 'string' || exercise_name.trim() === '') {
         res.status(400).json({ success: false, error: 'Exercise name is required' });
@@ -43,6 +47,7 @@ export class WorkoutController {
       const numReps = Number(reps);
       const numRir = Number(rir);
       const numWeight = weight !== undefined && weight !== null && weight !== '' ? Number(weight) : null;
+      const cleanProfile = profile && typeof profile === 'string' && profile.trim() ? profile.trim() : null;
 
       if (isNaN(numSets) || numSets <= 0 || !Number.isInteger(numSets)) {
         res.status(400).json({ success: false, error: 'Sets must be a positive integer' });
@@ -69,6 +74,7 @@ export class WorkoutController {
         reps: numReps,
         rir: numRir,
         weight: numWeight,
+        profile: cleanProfile,
         date: workoutDate,
         notes: notes ? String(notes).trim() : null,
         created_at: req.body.created_at || now,
@@ -103,6 +109,7 @@ export class WorkoutController {
             reps: Number(w.reps) || 1,
             rir: Number(w.rir) ?? 0,
             weight: w.weight !== undefined && w.weight !== null ? Number(w.weight) : null,
+            profile: w.profile ? String(w.profile).trim() : null,
             date: w.date || now.split('T')[0],
             notes: w.notes || null,
             created_at: w.created_at || now,
