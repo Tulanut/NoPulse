@@ -76,6 +76,18 @@
     - Move selected exercises to General (remove profile).
     - Bulk delete all selected exercises with confirmation prompt.
 
+### Phase 8: User Profile, Activity Tracking & Account Skeleton
+- **Features**:
+  - Added dedicated **Profile** tab in the auto-hiding top navigation header.
+  - **General Progress & Training Analytics**: Total workouts, lifetime tonnage lifted (kg/tonnes), peak weight record, total volume reps, average effort (RIR).
+  - **35-Day Consistency Heatmap Grid**: Visual calendar boxes showing active training days vs rest days.
+  - **Account & Security Settings Skeleton**:
+    - Change Username & Email with immediate local preview persistence.
+    - Change Profile Picture (file upload / custom photo base64 preview with remove option).
+    - Change Password (current, new, confirm inputs with client-side validation).
+    - One-click JSON data backup export.
+  - Designed with clean types (`client/src/types/user.ts`) for zero-friction mapping to future REST endpoints (`/api/user/profile`, `/api/user/password`) and SQLite user authentication tables.
+
 ---
 
 ## 3. Critical Bug Post-Mortems & Root Cause Analyses

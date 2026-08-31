@@ -4,6 +4,7 @@ import { LandingScreen } from './components/LandingScreen';
 import { ExerciseHub } from './components/ExerciseHub';
 import { ExerciseDetailView } from './components/ExerciseDetailView';
 import { WorkoutForm } from './components/WorkoutForm';
+import { UserProfileView } from './components/UserProfileView';
 import { useWorkouts } from './hooks/useWorkouts';
 import { useFullscreen } from './hooks/useFullscreen';
 import { ShieldCheck, HardDrive } from 'lucide-react';
@@ -145,6 +146,14 @@ export const App: React.FC = () => {
               onBack={handleBackToExercises}
               onAddWorkout={addWorkout}
               onDeleteWorkout={deleteWorkout}
+            />
+          )}
+
+          {/* 5. User Profile, Activity & Settings Screen */}
+          {currentScreen === 'profile' && (
+            <UserProfileView
+              workouts={allWorkouts}
+              onBackToHome={handleGoHome}
             />
           )}
         </div>

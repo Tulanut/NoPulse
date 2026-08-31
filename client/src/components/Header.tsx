@@ -1,8 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dumbbell, Wifi, WifiOff, RefreshCw, Database, AlertCircle, PlusCircle, Layers, Home, Maximize, Minimize, ChevronDown } from 'lucide-react';
+import {
+  Dumbbell,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  Database,
+  AlertCircle,
+  PlusCircle,
+  Layers,
+  Home,
+  User,
+  Maximize,
+  Minimize,
+  ChevronDown,
+} from 'lucide-react';
 import { SyncState } from '../services/syncService';
 
-export type ScreenState = 'landing' | 'log' | 'exercises' | 'exercise-detail';
+export type ScreenState = 'landing' | 'log' | 'exercises' | 'exercise-detail' | 'profile';
 
 interface HeaderProps {
   currentScreen: ScreenState;
@@ -160,6 +174,21 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Layers className="w-3 h-3" />
               <span>Exercises</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('profile');
+                setIsRevealed(false);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs active:scale-95 transition-all duration-200 ${
+                currentScreen === 'profile'
+                  ? 'bg-[#CC6543] text-white shadow-sm font-semibold'
+                  : 'text-claude-textMuted hover:text-claude-text hover:bg-claude-surface/50'
+              }`}
+            >
+              <User className="w-3 h-3" />
+              <span>Profile</span>
             </button>
           </nav>
 
