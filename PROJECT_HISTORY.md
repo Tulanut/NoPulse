@@ -116,6 +116,7 @@
    - Spelled out (`d Month yyyy`) only on catalog summary rows.
    - Standard numeric (`dd/mm/yy`) on date pickers and log timestamps.
 5. **No Forced Defaults**: Do not hardcode default profiles. If the user hasn't made one, keep the UI clean and general.
+6. **Git Push Protocol**: Never execute `git push` to remote repositories unless explicitly instructed by the user. Keep work local until requested.
 
 ---
 
