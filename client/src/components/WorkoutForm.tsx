@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Plus, Calendar, Tag, X } from 'lucide-react';
+import { Check, Plus, Calendar, FolderPlus, X } from 'lucide-react';
 
 interface WorkoutFormProps {
   profiles?: string[];
@@ -47,6 +47,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
   const [lastLoggedName, setLastLoggedName] = useState<string | null>(null);
+  const [lastLoggedProfile, setLastLoggedProfile] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,6 +90,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
       });
 
       setLastLoggedName(loggedName);
+      setLastLoggedProfile(selectedProfile);
       setSuccessMessage(true);
       setTimeout(() => setSuccessMessage(false), 3500);
       setNotes('');
@@ -125,7 +127,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
 
   return (
     <div className="min-h-[85vh] flex flex-col justify-center max-w-2xl mx-auto px-4 py-10 select-none animate-slide-up font-sans">
-      {/* Clean Bold Title (Sans-serif) */}
+      {/* Clean Bold Title */}
       <div className="mb-12 pb-6 border-b border-[#383530]/50 text-left">
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[#F5F2EB] leading-tight">
           Log Exercise
@@ -138,9 +140,11 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           <div className="flex items-center gap-2.5">
             <Check className="w-5 h-5 text-[#789D74]" />
             <span>
-              <strong className="font-bold text-white text-base">{lastLoggedName}</strong> recorded successfully
-              {selectedProfile && (
-                <span className="text-white/80 font-normal"> under <span className="font-semibold text-[#F5F2EB]">{selectedProfile}</span></span>
+              <strong className="font-bold text-white text-base">{lastLoggedName}</strong> saved
+              {lastLoggedProfile ? (
+                <span className="text-white/80 font-normal"> into <strong className="font-semibold text-[#F5F2EB]">{lastLoggedProfile}</strong></span>
+              ) : (
+                <span className="text-white/80 font-normal"> into <span className="text-[#A8A297]">General Exercises</span></span>
               )}.
             </span>
           </div>
@@ -194,11 +198,11 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           />
         </div>
 
-        {/* Field 3: Workout Profile (Optional Selection / Creation) */}
+        {/* Field 3: Add Profile Section (Choose to make or not) */}
         <div className="space-y-3 border-b border-[#383530]/60 pb-7">
           <div className="flex items-center justify-between">
             <label className="block text-xs tracking-widest uppercase text-[#A8A297] font-medium">
-              Workout Profile <span className="text-[10px] lowercase text-[#706B62]">(optional)</span>
+              Workout Profile
             </label>
             {selectedProfile && (
               <button
@@ -206,20 +210,33 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
                 onClick={() => setSelectedProfile(null)}
                 className="text-[11px] text-[#706B62] hover:text-[#CC6543] transition underline"
               >
-                Clear
+                Reset to None (General)
               </button>
             )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            {/* Existing profiles */}
+            {/* None / General (Default) */}
+            <button
+              type="button"
+              onClick={() => setSelectedProfile(null)}
+              className={`px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 ${
+                selectedProfile === null
+                  ? 'bg-[#383530] text-white font-bold shadow-sm'
+                  : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-[#F5F2EB]'
+              }`}
+            >
+              None (General)
+            </button>
+
+            {/* Existing user-created profiles */}
             {profiles.map((p) => {
               const isSelected = selectedProfile === p;
               return (
                 <button
                   key={p}
                   type="button"
-                  onClick={() => setSelectedProfile(isSelected ? null : p)}
+                  onClick={() => setSelectedProfile(p)}
                   className={`px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 ${
                     isSelected
                       ? 'bg-[#CC6543] text-white font-bold shadow-sm'
@@ -231,27 +248,26 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
               );
             })}
 
-            {/* Create New Profile Button / Form */}
+            {/* + Add / New Profile Button */}
             {onCreateProfile && (
               !isCreatingProfile ? (
                 <button
                   type="button"
                   onClick={() => setIsCreatingProfile(true)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs bg-[#252320]/60 border border-dashed border-[#4D4740] text-[#A8A297] hover:text-[#F5F2EB] hover:border-[#CC6543] transition-all"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-[#252320]/60 border border-dashed border-[#4D4740] text-[#A8A297] hover:text-[#F5F2EB] hover:border-[#CC6543] transition-all"
                 >
-                  <Plus className="w-3 h-3 text-[#CC6543]" />
-                  <span>{profiles.length === 0 ? 'Create Workout Profile' : 'New Profile'}</span>
+                  <FolderPlus className="w-3.5 h-3.5 text-[#CC6543]" />
+                  <span>+ New Profile</span>
                 </button>
               ) : (
                 <div className="inline-flex items-center gap-1.5 bg-[#252320] border border-[#CC6543] rounded-full px-3 py-1 animate-pop-in">
-                  <Tag className="w-3 h-3 text-[#CC6543]" />
                   <input
                     type="text"
-                    placeholder="e.g. Armwrestling, Rehab..."
+                    placeholder="Profile name (e.g. Armwrestling)..."
                     value={newProfileName}
                     onChange={(e) => setNewProfileName(e.target.value)}
                     autoFocus
-                    className="bg-transparent text-xs text-[#F5F2EB] placeholder-[#524E48] focus:outline-none w-40"
+                    className="bg-transparent text-xs text-[#F5F2EB] placeholder-[#524E48] focus:outline-none w-48"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
