@@ -153,28 +153,19 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
         </h1>
       </div>
 
-      {/* Center Viewport Minimalist Success Modal */}
+      {/* Minimalist, Non-Intrusive Success Toast (Zero Screen Blur) */}
       {successMessage && lastLoggedName && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-4">
-          {/* Subtle background dim */}
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" />
-
-          {/* Centered Premium Card */}
-          <div className="relative z-10 flex flex-col items-center justify-center gap-3 px-8 py-6 rounded-3xl bg-[#1F1D1A]/98 border border-[#789D74]/40 text-[#F5F2EB] shadow-2xl shadow-black/90 backdrop-blur-2xl animate-pop-in text-center max-w-xs sm:max-w-sm">
-            <div className="w-12 h-12 rounded-2xl bg-[#789D74]/20 border border-[#789D74]/40 text-[#789D74] flex items-center justify-center shadow-lg shadow-[#789D74]/20">
-              <Check className="w-6 h-6 stroke-[3]" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                {lastLoggedName}
-              </h3>
-              <p className="text-xs text-[#A8A297]">
-                {lastLoggedProfile ? (
-                  <>Saved directly to <strong className="text-[#CC6543] font-semibold">{lastLoggedProfile}</strong></>
-                ) : (
-                  'Workout logged successfully'
-                )}
-              </p>
+        <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 z-50 pointer-events-none animate-pop-in">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-[#201E1B]/95 border border-[#789D74]/50 text-[#F5F2EB] shadow-xl shadow-black/60 backdrop-blur-md">
+            <span className="w-5 h-5 rounded-full bg-[#789D74]/20 text-[#789D74] flex items-center justify-center shrink-0">
+              <Check className="w-3 h-3 stroke-[3]" />
+            </span>
+            <div className="text-xs font-medium flex items-center gap-1.5 whitespace-nowrap">
+              <span className="font-bold text-white">{lastLoggedName}</span>
+              <span className="text-[#A8A297]">logged</span>
+              {lastLoggedProfile && (
+                <span className="text-[#CC6543] font-semibold">· {lastLoggedProfile}</span>
+              )}
             </div>
           </div>
         </div>
