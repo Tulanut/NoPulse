@@ -154,7 +154,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
       {/* Clean Bold Title */}
       <div className="mb-12 pb-6 border-b border-[#383530]/50 text-left">
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[#F5F2EB] leading-tight">
-          Log Exercise
+          Log New Exercise
         </h1>
       </div>
 
