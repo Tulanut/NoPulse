@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Plus, Calendar, FolderPlus, X, Tag } from 'lucide-react';
+import { Plus, Calendar, FolderPlus, X, Tag } from 'lucide-react';
 
 interface WorkoutFormProps {
   profiles?: string[];
@@ -32,7 +32,6 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
   onCreateProfile,
   onAddWorkout,
   onWorkoutLogged,
-  onSuccessNavigate,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -47,9 +46,6 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
   const [newProfileName, setNewProfileName] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState(false);
-  const [lastLoggedName, setLastLoggedName] = useState<string | null>(null);
-  const [lastLoggedProfile, setLastLoggedProfile] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,13 +104,9 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
         notes: notes.trim() || undefined,
       });
 
-      setLastLoggedName(loggedName);
-      setLastLoggedProfile(effectiveProfile);
-      setSuccessMessage(true);
       if (onWorkoutLogged) {
         onWorkoutLogged(loggedName, effectiveProfile);
       }
-      setTimeout(() => setSuccessMessage(false), 3500);
       setNotes('');
     } catch (err: any) {
       setError(err.message || 'Failed to log workout');
@@ -157,50 +149,6 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           Log New Exercise
         </h1>
       </div>
-
-      {/* Minimalist, Non-Intrusive Success Toast (Zero Screen Blur) */}
-      {successMessage && lastLoggedName && (
-        <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 z-50 pointer-events-none animate-pop-in">
-          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-[#201E1B]/95 border border-[#789D74]/50 text-[#F5F2EB] shadow-xl shadow-black/60 backdrop-blur-md">
-            <span className="w-5 h-5 rounded-full bg-[#789D74]/20 text-[#789D74] flex items-center justify-center shrink-0">
-              <Check className="w-3 h-3 stroke-[3]" />
-            </span>
-            <div className="text-xs font-medium flex items-center gap-1.5 whitespace-nowrap">
-              <span className="font-bold text-white">{lastLoggedName}</span>
-              <span className="text-[#A8A297]">logged</span>
-              {lastLoggedProfile && (
-                <span className="text-[#CC6543] font-semibold">· {lastLoggedProfile}</span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Inline Success Banner */}
-      {successMessage && lastLoggedName && (
-        <div className="mb-10 p-4 rounded-2xl bg-[#789D74]/15 border border-[#789D74]/30 text-[#B8D4B5] text-sm flex items-center justify-between animate-pop-in">
-          <div className="flex items-center gap-2.5">
-            <Check className="w-5 h-5 text-[#789D74]" />
-            <span>
-              <strong className="font-bold text-white text-base">{lastLoggedName}</strong> saved directly into{' '}
-              {lastLoggedProfile ? (
-                <strong className="font-semibold text-white underline">{lastLoggedProfile}</strong>
-              ) : (
-                <span className="text-[#A8A297]">General Exercises</span>
-              )}.
-            </span>
-          </div>
-          {onSuccessNavigate && (
-            <button
-              type="button"
-              onClick={() => onSuccessNavigate(lastLoggedName)}
-              className="text-xs uppercase tracking-wider underline text-white hover:text-claude-terracottaLight transition ml-4 shrink-0 font-medium"
-            >
-              View History →
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Error Alert */}
       {error && (

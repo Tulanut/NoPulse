@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft,
   Calendar,
-  Check,
   Plus,
   Trash2,
   Clock,
@@ -83,7 +82,6 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
   const [newProfileName, setNewProfileName] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -166,11 +164,9 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
         notes: notes.trim() || undefined,
       });
 
-      setSuccessMessage(true);
       if (onWorkoutLogged) {
         onWorkoutLogged(exerciseName, effectiveProfile);
       }
-      setTimeout(() => setSuccessMessage(false), 2500);
       setNotes('');
     } catch (err: any) {
       setError(err.message || 'Failed to log workout');
@@ -253,32 +249,6 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Minimalist, Non-Intrusive Success Toast (Zero Screen Blur) */}
-      {successMessage && (
-        <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 z-50 pointer-events-none animate-pop-in">
-          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-[#201E1B]/95 border border-[#789D74]/50 text-[#F5F2EB] shadow-xl shadow-black/60 backdrop-blur-md">
-            <span className="w-5 h-5 rounded-full bg-[#789D74]/20 text-[#789D74] flex items-center justify-center shrink-0">
-              <Check className="w-3 h-3 stroke-[3]" />
-            </span>
-            <div className="text-xs font-medium flex items-center gap-1.5 whitespace-nowrap">
-              <span className="font-bold text-white">{exerciseName}</span>
-              <span className="text-[#A8A297]">set logged</span>
-              {selectedProfile && (
-                <span className="text-[#CC6543] font-semibold">· {selectedProfile}</span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Success Banner */}
-      {successMessage && (
-        <div className="p-4 rounded-2xl bg-[#789D74]/15 border border-[#789D74]/30 text-[#B8D4B5] text-sm flex items-center gap-2.5 animate-pop-in">
-          <Check className="w-5 h-5 text-[#789D74]" />
-          <span>New entry for <strong className="font-bold text-white text-base">{exerciseName}</strong> saved.</span>
-        </div>
-      )}
 
       {/* Error Alert */}
       {error && (
