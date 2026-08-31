@@ -76,11 +76,14 @@
     - Move selected exercises to General (remove profile).
     - Bulk delete all selected exercises with confirmation prompt.
 
-### Phase 8: User Profile, Activity Tracking & Account Skeleton
+### Phase 8: User Profile, Activity Tracking & Socials Skeleton
 - **Features**:
   - Added dedicated **Profile** tab in the auto-hiding top navigation header.
   - **General Progress & Training Analytics**: Total workouts, lifetime tonnage lifted (kg/tonnes), peak weight record, total volume reps, average effort (RIR).
   - **35-Day Consistency Heatmap Grid**: Visual calendar boxes showing active training days vs rest days.
+  - **Social Media & Spotify Music Sharing**:
+    - Share handles / links for Instagram, YouTube, TikTok, and Spotify Profile / Workout Playlists.
+    - Clickable badges displayed on top profile card with direct external links.
   - **Account & Security Settings Skeleton**:
     - Change Username & Email with immediate local preview persistence.
     - Change Profile Picture (file upload / custom photo base64 preview with remove option).
