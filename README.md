@@ -15,7 +15,7 @@ This project demonstrates core architectural patterns requested across modern te
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### 1. Prerequisites
 - **Node.js**: v18+ (tested on v22)
@@ -41,7 +41,7 @@ Open your browser at: **`http://localhost:5173`**
 
 ---
 
-## 🧪 Testing & Verification
+##  Testing & Verification
 
 ### Run Backend Integration Tests:
 ```powershell
@@ -57,7 +57,7 @@ npm run build
 
 ---
 
-## 📱 Features Included
+##  Features Included
 
 - **Exercise Logging**:
   - Exercise Name (with quick-select tags: Bench Press, Squat, Deadlift, etc.)
