@@ -7,7 +7,12 @@ import { WorkoutForm } from './components/WorkoutForm';
 import { UserProfileView } from './components/UserProfileView';
 import { useWorkouts } from './hooks/useWorkouts';
 import { useFullscreen } from './hooks/useFullscreen';
-import { ShieldCheck, HardDrive } from 'lucide-react';
+import { ShieldCheck, HardDrive, Check } from 'lucide-react';
+
+interface ActiveToast {
+  exerciseName: string;
+  profile?: string | null;
+}
 
 export const App: React.FC = () => {
   const {
@@ -31,6 +36,16 @@ export const App: React.FC = () => {
 
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('landing');
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+
+  // Global Viewport-Locked Toast Notification (Screen-Positioned, Zero Blur)
+  const [activeToast, setActiveToast] = useState<ActiveToast | null>(null);
+
+  const handleWorkoutLogged = (exerciseName: string, profile?: string | null) => {
+    setActiveToast({ exerciseName, profile });
+    setTimeout(() => {
+      setActiveToast(null);
+    }, 2200);
+  };
 
   // Nav Position: 'top' | 'side' (Stored locally)
   const [navPosition, setNavPosition] = useState<NavPosition>(() => {
@@ -68,7 +83,43 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#191816] text-[#F5F2EB] flex flex-col font-sans selection:bg-[#CC6543] selection:text-white">
+    <div className="min-h-screen bg-[#191816] text-[#F5F2EB] flex flex-col font-sans selection:bg-[#CC6543] selection:text-white relative">
+      {/* =========================================================================
+          GLOBAL VIEWPORT-LOCKED TOAST (Screen Center on Mobile / Top-Right on Laptop)
+          Zero screen blur, 100% visible regardless of page scroll position
+         ========================================================================= */}
+      {activeToast && (
+        <div className="fixed inset-0 pointer-events-none z-[99999] flex items-center justify-center sm:items-start sm:justify-end p-4 sm:p-6">
+          {/* 1. Mobile Phone View: Exact Center of the Screen Viewport */}
+          <div className="sm:hidden flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-[#1C1A17]/95 border border-[#789D74]/50 text-[#F5F2EB] shadow-2xl shadow-black/90 backdrop-blur-xl animate-pop-in">
+            <span className="w-6 h-6 rounded-full bg-[#789D74]/20 text-[#789D74] flex items-center justify-center shrink-0">
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+            </span>
+            <div className="text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap">
+              <span className="font-bold text-white">{activeToast.exerciseName}</span>
+              <span className="text-[#A8A297]">logged</span>
+              {activeToast.profile && (
+                <span className="text-[#CC6543] font-bold">· {activeToast.profile}</span>
+              )}
+            </div>
+          </div>
+
+          {/* 2. Laptop / Desktop View: Clean Top-Right Screen Corner Notification */}
+          <div className="hidden sm:flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#1C1A17]/95 border border-[#789D74]/50 text-[#F5F2EB] shadow-2xl shadow-black/80 backdrop-blur-xl animate-slide-up">
+            <span className="w-6 h-6 rounded-full bg-[#789D74]/20 text-[#789D74] flex items-center justify-center shrink-0">
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+            </span>
+            <div className="text-xs font-medium flex items-center gap-1.5 whitespace-nowrap">
+              <span className="font-bold text-white">{activeToast.exerciseName}</span>
+              <span className="text-[#A8A297]">logged successfully</span>
+              {activeToast.profile && (
+                <span className="text-[#CC6543] font-semibold">· {activeToast.profile}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Header / Sidebar - Auto-hides, shown inside app sections */}
       {currentScreen !== 'landing' && (
         <Header
@@ -132,6 +183,7 @@ export const App: React.FC = () => {
               profiles={profiles}
               onCreateProfile={createProfile}
               onAddWorkout={addWorkout}
+              onWorkoutLogged={handleWorkoutLogged}
               onBack={handleGoHome}
               onSuccessNavigate={(name) => handleSelectExercise(name)}
             />
@@ -162,6 +214,7 @@ export const App: React.FC = () => {
               onCreateProfile={createProfile}
               onBack={handleBackToExercises}
               onAddWorkout={addWorkout}
+              onWorkoutLogged={handleWorkoutLogged}
               onDeleteWorkout={deleteWorkout}
             />
           )}

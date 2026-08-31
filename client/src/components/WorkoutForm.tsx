@@ -14,6 +14,7 @@ interface WorkoutFormProps {
     date: string;
     notes?: string;
   }) => Promise<any>;
+  onWorkoutLogged?: (exerciseName: string, profile?: string | null) => void;
   onBack?: () => void;
   onSuccessNavigate?: (exerciseName: string) => void;
 }
@@ -30,6 +31,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
   profiles = [],
   onCreateProfile,
   onAddWorkout,
+  onWorkoutLogged,
   onSuccessNavigate,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
@@ -109,6 +111,9 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
       setLastLoggedName(loggedName);
       setLastLoggedProfile(effectiveProfile);
       setSuccessMessage(true);
+      if (onWorkoutLogged) {
+        onWorkoutLogged(loggedName, effectiveProfile);
+      }
       setTimeout(() => setSuccessMessage(false), 3500);
       setNotes('');
     } catch (err: any) {

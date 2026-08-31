@@ -30,6 +30,7 @@ interface ExerciseDetailViewProps {
     date: string;
     notes?: string;
   }) => Promise<any>;
+  onWorkoutLogged?: (exerciseName: string, profile?: string | null) => void;
   onDeleteWorkout: (id: string) => void;
 }
 
@@ -48,6 +49,7 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
   onCreateProfile,
   onBack,
   onAddWorkout,
+  onWorkoutLogged,
   onDeleteWorkout,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
@@ -165,6 +167,9 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
       });
 
       setSuccessMessage(true);
+      if (onWorkoutLogged) {
+        onWorkoutLogged(exerciseName, effectiveProfile);
+      }
       setTimeout(() => setSuccessMessage(false), 2500);
       setNotes('');
     } catch (err: any) {
