@@ -26,11 +26,12 @@ class LocalDatabase {
           const workoutStore = db.createObjectStore(WORKOUTS_STORE, { keyPath: 'id' });
           workoutStore.createIndex('date', 'date', { unique: false });
           workoutStore.createIndex('exercise_name', 'exercise_name', { unique: false });
+          workoutStore.createIndex('profile', 'profile', { unique: false });
           workoutStore.createIndex('sync_status', 'sync_status', { unique: false });
           workoutStore.createIndex('updated_at', 'updated_at', { unique: false });
         }
 
-        // Metadata store (for last_synced_at timestamp)
+        // Metadata store (for last_synced_at timestamp, custom profiles, etc.)
         if (!db.objectStoreNames.contains(METADATA_STORE)) {
           db.createObjectStore(METADATA_STORE, { keyPath: 'key' });
         }
@@ -215,6 +216,38 @@ class LocalDatabase {
       });
     } catch (e) {
       console.error('Error setting last_synced_at:', e);
+    }
+  }
+
+  // Get custom workout profiles created by user
+  public async getCustomProfiles(): Promise<string[]> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(METADATA_STORE, 'readonly');
+        const store = tx.objectStore(METADATA_STORE);
+        const req = store.get('custom_workout_profiles');
+        req.onsuccess = () => resolve(req.result?.value || []);
+        req.onerror = () => resolve([]);
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  // Save custom workout profiles
+  public async saveCustomProfiles(profiles: string[]): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(METADATA_STORE, 'readwrite');
+        const store = tx.objectStore(METADATA_STORE);
+        const req = store.put({ key: 'custom_workout_profiles', value: profiles });
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.error('Error saving custom profiles:', e);
     }
   }
 }

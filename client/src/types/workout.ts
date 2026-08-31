@@ -7,6 +7,7 @@ export interface Workout {
   reps: number;
   rir: number; // Reps in reserve (0 = failure, 1 = 1 rep in tank, etc.)
   weight?: number | null; // Load lifted in kg or lbs
+  profile?: string | null; // Optional user workout profile (e.g. "Armwrestling", "Rehab")
   date: string; // YYYY-MM-DD
   notes?: string | null;
   created_at: string;
@@ -30,6 +31,7 @@ export interface SyncResponse {
 export interface WorkoutFilter {
   exercise?: string;
   date?: string;
+  profile?: string;
   searchQuery?: string;
 }
 

@@ -5,11 +5,12 @@ export interface Workout {
   reps: number;
   rir: number;
   weight?: number | null;
+  profile?: string | null;
   date: string;
   notes?: string | null;
   created_at: string;
   updated_at: string;
-  is_deleted?: number; // 0 = active, 1 = soft-deleted
+  is_deleted?: number;
 }
 
 export interface SyncPayload {
@@ -24,15 +25,9 @@ export interface SyncResponse {
   timestamp: string;
 }
 
-export interface CreateWorkoutDto {
-  id?: string;
-  exercise_name: string;
-  sets: number;
-  reps: number;
-  rir: number;
-  weight?: number | null;
-  date: string;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
+export interface WorkoutFilter {
+  exercise?: string;
+  date?: string;
+  profile?: string;
+  searchQuery?: string;
 }

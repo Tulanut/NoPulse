@@ -11,6 +11,8 @@ import { ShieldCheck, HardDrive } from 'lucide-react';
 export const App: React.FC = () => {
   const {
     allWorkouts,
+    profiles,
+    createProfile,
     syncState,
     lastSyncedAt,
     pendingSyncCount,
@@ -71,7 +73,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Main Screen Content with Dedicated Top Clearance so Header never stacks over content */}
+      {/* Main Screen Content with Dedicated Top Clearance */}
       <main
         className={`flex-1 w-full max-w-5xl mx-auto px-4 ${
           currentScreen === 'landing'
@@ -79,7 +81,7 @@ export const App: React.FC = () => {
             : 'pt-16 sm:pt-20 pb-16'
         }`}
       >
-        {/* Offline Banner if Offline (only shown when not on landing screen) */}
+        {/* Offline Banner if Offline */}
         {!network.isOnline && currentScreen !== 'landing' && (
           <div className="mb-6 p-3.5 rounded-xl bg-gradient-to-r from-[#E08E45]/15 to-claude-surface border border-[#E08E45]/40 text-[#F0BD85] flex items-center gap-3 text-xs animate-slide-up">
             <HardDrive className="w-4 h-4 text-[#E08E45] shrink-0" />
@@ -105,6 +107,8 @@ export const App: React.FC = () => {
           {/* 2. Dedicated Log Exercise Screen */}
           {currentScreen === 'log' && (
             <WorkoutForm
+              profiles={profiles}
+              onCreateProfile={createProfile}
               onAddWorkout={addWorkout}
               onBack={handleGoHome}
               onSuccessNavigate={(name) => handleSelectExercise(name)}
@@ -115,6 +119,8 @@ export const App: React.FC = () => {
           {currentScreen === 'exercises' && (
             <ExerciseHub
               workouts={allWorkouts}
+              profiles={profiles}
+              onCreateProfile={createProfile}
               onSelectExercise={handleSelectExercise}
               onGoToLog={() => setCurrentScreen('log')}
               onGoHome={handleGoHome}
@@ -126,6 +132,8 @@ export const App: React.FC = () => {
             <ExerciseDetailView
               exerciseName={selectedExercise}
               allWorkouts={allWorkouts}
+              profiles={profiles}
+              onCreateProfile={createProfile}
               onBack={handleBackToExercises}
               onAddWorkout={addWorkout}
               onDeleteWorkout={deleteWorkout}

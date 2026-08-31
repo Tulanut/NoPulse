@@ -8,6 +8,7 @@ import {
   Clock,
   CheckCircle2,
   Zap,
+  X,
 } from 'lucide-react';
 import { Workout } from '../types/workout';
 import { formatStandardDate } from '../utils/dateUtils';
@@ -16,6 +17,8 @@ import { ProgressionChart } from './ProgressionChart';
 interface ExerciseDetailViewProps {
   exerciseName: string;
   allWorkouts: Workout[];
+  profiles?: string[];
+  onCreateProfile?: (name: string) => Promise<string>;
   onBack: () => void;
   onAddWorkout: (data: {
     exercise_name: string;
@@ -23,6 +26,7 @@ interface ExerciseDetailViewProps {
     reps: number;
     rir: number;
     weight?: number | null;
+    profile?: string | null;
     date: string;
     notes?: string;
   }) => Promise<any>;
@@ -40,6 +44,8 @@ const RIR_OPTIONS = [
 export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
   exerciseName,
   allWorkouts,
+  profiles = [],
+  onCreateProfile,
   onBack,
   onAddWorkout,
   onDeleteWorkout,
@@ -58,12 +64,21 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
       });
   }, [allWorkouts, exerciseName]);
 
+  // Determine last used profile for this exercise
+  const lastUsedProfile = useMemo(() => {
+    const withProfile = exerciseWorkouts.find((w) => Boolean(w.profile));
+    return withProfile ? withProfile.profile : null;
+  }, [exerciseWorkouts]);
+
   // Form State
   const [date, setDate] = useState<string>(todayStr);
   const [sets, setSets] = useState<number>(3);
   const [reps, setReps] = useState<number>(10);
   const [weight, setWeight] = useState<string>('');
   const [rir, setRir] = useState<number>(2);
+  const [selectedProfile, setSelectedProfile] = useState<string | null>(lastUsedProfile || null);
+  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [newProfileName, setNewProfileName] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
@@ -84,6 +99,11 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
         ? exerciseWorkouts.reduce((sum, w) => sum + w.rir, 0) / totalSessions
         : 0;
 
+    // Collect all profiles this exercise has been logged under
+    const distinctProfiles = Array.from(
+      new Set(exerciseWorkouts.map((w) => w.profile).filter((p): p is string => Boolean(p)))
+    );
+
     return {
       totalSessions,
       totalSets,
@@ -91,6 +111,7 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
       maxWeight,
       avgRir: Math.round(avgRir * 10) / 10,
       lastTrained: exerciseWorkouts[0]?.date || 'None yet',
+      distinctProfiles,
     };
   }, [exerciseWorkouts]);
 
@@ -122,6 +143,7 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
         reps,
         rir,
         weight: parsedWeight,
+        profile: selectedProfile,
         date: effectiveDate,
         notes: notes.trim() || undefined,
       });
@@ -134,6 +156,16 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCreateProfileInline = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProfileName.trim() || !onCreateProfile) return;
+
+    const created = await onCreateProfile(newProfileName.trim());
+    setSelectedProfile(created);
+    setNewProfileName('');
+    setIsCreatingProfile(false);
   };
 
   const adjustValue = (
@@ -163,10 +195,24 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
         </button>
 
         <div className="pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-3">
-          {/* Bold Sans Title */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[#F5F2EB] leading-tight">
-            {exerciseName}
-          </h1>
+          <div>
+            <div className="flex items-center gap-3">
+              {/* Bold Title */}
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[#F5F2EB] leading-tight">
+                {exerciseName}
+              </h1>
+
+              {/* Profile Badges */}
+              {stats.distinctProfiles.map((pr) => (
+                <span
+                  key={pr}
+                  className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#252320] border border-[#383530] text-[#CC6543]"
+                >
+                  {pr}
+                </span>
+              ))}
+            </div>
+          </div>
 
           {/* Clean Summary Stats Line */}
           <div className="flex flex-wrap items-center gap-x-3 text-xs sm:text-sm text-[#A8A297]">
@@ -207,7 +253,7 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
           <ProgressionChart workouts={exerciseWorkouts} exerciseName={exerciseName} />
         </div>
 
-        {/* Right (3-4 Cols): Compact, Smaller Fast Log Box */}
+        {/* Right (3-4 Cols): Compact Fast Log Box */}
         <div className="lg:col-span-4 xl:col-span-3 bg-[#252320]/80 border border-[#383530] rounded-xl p-3.5 sm:p-4 shadow-sm space-y-3.5">
           <div className="flex items-center gap-1.5 pb-2 border-b border-[#383530]/60">
             <Zap className="w-3.5 h-3.5 text-[#CC6543]" />
@@ -231,6 +277,86 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
                 title="Date of workout"
               />
             </div>
+
+            {/* Optional Profile Selector */}
+            {(profiles.length > 0 || isCreatingProfile) && (
+              <div className="space-y-1 border-b border-[#383530]/60 pb-2">
+                <div className="flex items-center justify-between text-[9px] uppercase tracking-wider text-[#A8A297] font-medium">
+                  <span>Profile</span>
+                  {selectedProfile && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProfile(null)}
+                      className="text-[9px] text-[#706B62] hover:text-[#CC6543] underline"
+                    >
+                      None
+                    </button>
+                  )}
+                </div>
+
+                {!isCreatingProfile ? (
+                  <div className="flex flex-wrap gap-1">
+                    {profiles.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setSelectedProfile(selectedProfile === p ? null : p)}
+                        className={`px-2 py-0.5 rounded text-[10px] transition ${
+                          selectedProfile === p
+                            ? 'bg-[#CC6543] text-white font-bold'
+                            : 'bg-[#191816] text-[#A8A297] border border-[#383530]'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                    {onCreateProfile && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingProfile(true)}
+                        className="px-1.5 py-0.5 rounded text-[10px] text-[#706B62] hover:text-[#CC6543] border border-dashed border-[#383530]"
+                      >
+                        +
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 bg-[#191816] border border-[#CC6543] rounded px-1.5 py-0.5 animate-pop-in">
+                    <input
+                      type="text"
+                      placeholder="Profile name..."
+                      value={newProfileName}
+                      onChange={(e) => setNewProfileName(e.target.value)}
+                      autoFocus
+                      className="bg-transparent text-[10px] text-[#F5F2EB] focus:outline-none w-full"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCreateProfileInline(e);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateProfileInline}
+                      className="text-[9px] font-bold text-[#CC6543]"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingProfile(false);
+                        setNewProfileName('');
+                      }}
+                      className="text-[#706B62]"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Sets & Reps */}
             <div className="grid grid-cols-2 gap-2">
@@ -386,7 +512,7 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
                   className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
                 >
                   <div className="space-y-1 flex-1">
-                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2.5 text-sm">
                       <span className="font-bold text-[#F5F2EB] text-sm tracking-wider">
                         {formatStandardDate(workout.date)}
                       </span>
@@ -399,6 +525,11 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
                       <span className="text-xs text-[#A8A297]">
                         ({workout.rir} RIR)
                       </span>
+                      {workout.profile && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#252320] border border-[#383530] text-[#CC6543]">
+                          {workout.profile}
+                        </span>
+                      )}
                     </div>
 
                     {workout.notes && (

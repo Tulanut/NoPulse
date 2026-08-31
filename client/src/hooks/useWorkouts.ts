@@ -17,6 +17,7 @@ function generateUUID(): string {
 
 export function useWorkouts() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [customProfiles, setCustomProfiles] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [syncState, setSyncState] = useState<SyncState>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -25,11 +26,13 @@ export function useWorkouts() {
 
   const network = useNetworkStatus();
 
-  // Reload local workouts from IndexedDB
+  // Reload local workouts and profiles from IndexedDB
   const refreshLocalWorkouts = useCallback(async () => {
     try {
       const data = await localDB.getAllWorkouts(false);
+      const savedProfiles = await localDB.getCustomProfiles();
       setWorkouts(data);
+      setCustomProfiles(savedProfiles);
     } catch (err) {
       console.error('Failed to load local workouts:', err);
     } finally {
@@ -65,6 +68,50 @@ export function useWorkouts() {
     }
   }, [network.isOnline, refreshLocalWorkouts]);
 
+  // Unique list of all active profiles (user-created + logged)
+  const profiles = useMemo(() => {
+    const profileSet = new Set<string>();
+
+    // Add stored custom profiles
+    customProfiles.forEach((p) => {
+      if (p.trim()) profileSet.add(p.trim());
+    });
+
+    // Add profiles present in logged workouts
+    workouts.forEach((w) => {
+      if (w.profile && w.profile.trim()) {
+        profileSet.add(w.profile.trim());
+      }
+    });
+
+    return Array.from(profileSet).sort();
+  }, [customProfiles, workouts]);
+
+  // Create a new workout profile
+  const createProfile = useCallback(
+    async (profileName: string): Promise<string> => {
+      const trimmed = profileName.trim();
+      if (!trimmed) return '';
+
+      const updated = Array.from(new Set([...customProfiles, trimmed]));
+      setCustomProfiles(updated);
+      await localDB.saveCustomProfiles(updated);
+      return trimmed;
+    },
+    [customProfiles]
+  );
+
+  // Delete a profile
+  const deleteProfile = useCallback(
+    async (profileName: string) => {
+      const trimmed = profileName.trim();
+      const updated = customProfiles.filter((p) => p !== trimmed);
+      setCustomProfiles(updated);
+      await localDB.saveCustomProfiles(updated);
+    },
+    [customProfiles]
+  );
+
   // Add a new workout log
   const addWorkout = useCallback(
     async (data: {
@@ -72,6 +119,8 @@ export function useWorkouts() {
       sets: number;
       reps: number;
       rir: number;
+      weight?: number | null;
+      profile?: string | null;
       date: string;
       notes?: string;
     }) => {
@@ -82,6 +131,8 @@ export function useWorkouts() {
         sets: data.sets,
         reps: data.reps,
         rir: data.rir,
+        weight: data.weight ?? null,
+        profile: data.profile ? data.profile.trim() : null,
         date: data.date || now.split('T')[0],
         notes: data.notes?.trim() || null,
         created_at: now,
@@ -90,18 +141,25 @@ export function useWorkouts() {
         sync_status: 'pending',
       };
 
-      // 1. Save immediately to local IndexedDB (Zero latency, works offline)
+      // 1. If profile is new, also save to custom profiles
+      if (newWorkout.profile && !customProfiles.includes(newWorkout.profile)) {
+        const nextProfiles = [...customProfiles, newWorkout.profile];
+        setCustomProfiles(nextProfiles);
+        await localDB.saveCustomProfiles(nextProfiles);
+      }
+
+      // 2. Save immediately to local IndexedDB (Zero latency, works offline)
       await localDB.saveWorkout(newWorkout);
       await refreshLocalWorkouts();
 
-      // 2. If online, initiate background sync
+      // 3. If online, initiate background sync
       if (network.isOnline) {
         syncService.runSync().then(() => refreshLocalWorkouts());
       }
 
       return newWorkout;
     },
-    [network.isOnline, refreshLocalWorkouts]
+    [customProfiles, network.isOnline, refreshLocalWorkouts]
   );
 
   // Delete a workout
@@ -127,6 +185,9 @@ export function useWorkouts() {
   // Filtered workouts
   const filteredWorkouts = useMemo(() => {
     return workouts.filter((w) => {
+      if (filter.profile && w.profile !== filter.profile) {
+        return false;
+      }
       if (filter.exercise && !w.exercise_name.toLowerCase().includes(filter.exercise.toLowerCase())) {
         return false;
       }
@@ -169,6 +230,9 @@ export function useWorkouts() {
   return {
     workouts: filteredWorkouts,
     allWorkouts: workouts,
+    profiles,
+    createProfile,
+    deleteProfile,
     loading,
     syncState,
     lastSyncedAt,

@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { Check, Plus, Calendar } from 'lucide-react';
+import { Check, Plus, Calendar, Tag, X } from 'lucide-react';
 
 interface WorkoutFormProps {
+  profiles?: string[];
+  onCreateProfile?: (name: string) => Promise<string>;
   onAddWorkout: (data: {
     exercise_name: string;
     sets: number;
     reps: number;
     rir: number;
     weight?: number | null;
+    profile?: string | null;
     date: string;
     notes?: string;
   }) => Promise<any>;
@@ -24,6 +27,8 @@ const RIR_OPTIONS = [
 ];
 
 export const WorkoutForm: React.FC<WorkoutFormProps> = ({
+  profiles = [],
+  onCreateProfile,
   onAddWorkout,
   onSuccessNavigate,
 }) => {
@@ -35,6 +40,9 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
   const [reps, setReps] = useState<number>(10);
   const [weight, setWeight] = useState<string>('');
   const [rir, setRir] = useState<number>(2);
+  const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
+  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [newProfileName, setNewProfileName] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
@@ -75,6 +83,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
         reps,
         rir,
         weight: parsedWeight,
+        profile: selectedProfile,
         date: effectiveDate,
         notes: notes.trim() || undefined,
       });
@@ -88,6 +97,16 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCreateProfileInline = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProfileName.trim() || !onCreateProfile) return;
+
+    const created = await onCreateProfile(newProfileName.trim());
+    setSelectedProfile(created);
+    setNewProfileName('');
+    setIsCreatingProfile(false);
   };
 
   const adjustValue = (
@@ -119,7 +138,10 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           <div className="flex items-center gap-2.5">
             <Check className="w-5 h-5 text-[#789D74]" />
             <span>
-              <strong className="font-bold text-white text-base">{lastLoggedName}</strong> recorded successfully.
+              <strong className="font-bold text-white text-base">{lastLoggedName}</strong> recorded successfully
+              {selectedProfile && (
+                <span className="text-white/80 font-normal"> under <span className="font-semibold text-[#F5F2EB]">{selectedProfile}</span></span>
+              )}.
             </span>
           </div>
           {onSuccessNavigate && (
@@ -141,8 +163,8 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
         </div>
       )}
 
-      {/* Clean Sans Form */}
-      <form onSubmit={handleSubmit} className="space-y-12 sm:space-y-14">
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-10 sm:space-y-12">
         {/* Field 1: Standard dd/mm/yy Date Input */}
         <div className="flex items-center gap-3 border-b border-[#383530]/60 pb-6 focus-within:border-[#CC6543] transition-colors group">
           <Calendar className="w-4 h-4 text-[#CC6543] shrink-0" />
@@ -165,14 +187,102 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           </label>
           <input
             type="text"
-            placeholder="e.g. Bench Press, Squat, Lat Pulldown..."
+            placeholder="e.g. Bench Press, Wrist Curl, Lateral Raise..."
             value={exerciseName}
             onChange={(e) => setExerciseName(e.target.value)}
             className="w-full bg-transparent text-lg sm:text-xl font-bold text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
           />
         </div>
 
-        {/* Field 3: Unified Sets, Reps & Weight Row */}
+        {/* Field 3: Workout Profile (Optional Selection / Creation) */}
+        <div className="space-y-3 border-b border-[#383530]/60 pb-7">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs tracking-widest uppercase text-[#A8A297] font-medium">
+              Workout Profile <span className="text-[10px] lowercase text-[#706B62]">(optional)</span>
+            </label>
+            {selectedProfile && (
+              <button
+                type="button"
+                onClick={() => setSelectedProfile(null)}
+                className="text-[11px] text-[#706B62] hover:text-[#CC6543] transition underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {/* Existing profiles */}
+            {profiles.map((p) => {
+              const isSelected = selectedProfile === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setSelectedProfile(isSelected ? null : p)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 ${
+                    isSelected
+                      ? 'bg-[#CC6543] text-white font-bold shadow-sm'
+                      : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-[#F5F2EB] hover:border-[#4D4740]'
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+
+            {/* Create New Profile Button / Form */}
+            {onCreateProfile && (
+              !isCreatingProfile ? (
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingProfile(true)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs bg-[#252320]/60 border border-dashed border-[#4D4740] text-[#A8A297] hover:text-[#F5F2EB] hover:border-[#CC6543] transition-all"
+                >
+                  <Plus className="w-3 h-3 text-[#CC6543]" />
+                  <span>{profiles.length === 0 ? 'Create Workout Profile' : 'New Profile'}</span>
+                </button>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 bg-[#252320] border border-[#CC6543] rounded-full px-3 py-1 animate-pop-in">
+                  <Tag className="w-3 h-3 text-[#CC6543]" />
+                  <input
+                    type="text"
+                    placeholder="e.g. Armwrestling, Rehab..."
+                    value={newProfileName}
+                    onChange={(e) => setNewProfileName(e.target.value)}
+                    autoFocus
+                    className="bg-transparent text-xs text-[#F5F2EB] placeholder-[#524E48] focus:outline-none w-40"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateProfileInline(e);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateProfileInline}
+                    className="text-[10px] uppercase font-bold text-[#CC6543] hover:text-[#DE7C5A] px-1"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingProfile(false);
+                      setNewProfileName('');
+                    }}
+                    className="text-[#706B62] hover:text-[#F5F2EB]"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Field 4: Unified Sets, Reps & Weight Row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 border-b border-[#383530]/60 pb-9">
           {/* Sets */}
           <div className="space-y-3">
@@ -263,7 +373,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           </div>
         </div>
 
-        {/* Field 4: Reps in Reserve (RIR) */}
+        {/* Field 5: Reps in Reserve (RIR) */}
         <div className="space-y-4 border-b border-[#383530]/60 pb-9">
           <div className="flex items-baseline justify-between">
             <label className="block text-xs tracking-widest uppercase text-[#A8A297] font-medium">
@@ -300,7 +410,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           </div>
         </div>
 
-        {/* Field 5: Optional Notes */}
+        {/* Field 6: Optional Notes */}
         <div className="space-y-3 border-b border-[#383530]/60 pb-8">
           <label className="block text-xs tracking-widest uppercase text-[#A8A297] font-medium">
             Notes (Optional)

@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowRight, Plus, Search } from 'lucide-react';
+import { ArrowRight, Plus, Search, X, Tag } from 'lucide-react';
 import { Workout } from '../types/workout';
 import { formatSpelledDate } from '../utils/dateUtils';
 
 interface ExerciseHubProps {
   workouts: Workout[];
+  profiles: string[];
+  onCreateProfile: (name: string) => Promise<string>;
   onSelectExercise: (exerciseName: string) => void;
   onGoToLog: () => void;
   onGoHome: () => void;
@@ -19,20 +21,32 @@ interface ExerciseSummary {
   avgRir: number;
   lastTrainedDate: string | null;
   latestRir: number | null;
+  profiles: string[];
 }
 
 export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   workouts,
+  profiles,
+  onCreateProfile,
   onSelectExercise,
   onGoToLog,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedProfile, setSelectedProfile] = useState<string>('all');
+  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [newProfileName, setNewProfileName] = useState('');
 
-  // Group ONLY exercises that the user has actually logged
+  // Filter workouts by active profile tab (if not 'all')
+  const profileFilteredWorkouts = useMemo(() => {
+    if (selectedProfile === 'all') return workouts;
+    return workouts.filter((w) => w.profile === selectedProfile);
+  }, [workouts, selectedProfile]);
+
+  // Group ONLY exercises that match the profile filter
   const exerciseSummaries = useMemo(() => {
     const map = new Map<string, Workout[]>();
 
-    for (const w of workouts) {
+    for (const w of profileFilteredWorkouts) {
       const key = w.exercise_name.trim();
       if (!map.has(key)) {
         map.set(key, []);
@@ -57,6 +71,11 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
       const lastTrainedDate = sorted[0]?.date || null;
       const latestRir = sorted[0]?.rir ?? null;
 
+      // Collect unique profiles associated with this exercise
+      const exProfiles = Array.from(
+        new Set(items.map((i) => i.profile).filter((p): p is string => Boolean(p)))
+      );
+
       summaries.push({
         name,
         totalLogs,
@@ -66,11 +85,12 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         avgRir: Math.round(avgRir * 10) / 10,
         lastTrainedDate,
         latestRir,
+        profiles: exProfiles,
       });
     });
 
     return summaries.sort((a, b) => b.totalLogs - a.totalLogs);
-  }, [workouts]);
+  }, [profileFilteredWorkouts]);
 
   const filteredSummaries = useMemo(() => {
     if (!searchQuery.trim()) return exerciseSummaries;
@@ -79,35 +99,116 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     );
   }, [exerciseSummaries, searchQuery]);
 
+  const handleCreateProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProfileName.trim()) return;
+
+    const created = await onCreateProfile(newProfileName.trim());
+    setSelectedProfile(created);
+    setNewProfileName('');
+    setIsCreatingProfile(false);
+  };
+
   return (
     <div className="min-h-[85vh] flex flex-col justify-center max-w-3xl mx-auto px-4 py-8 select-none animate-slide-up font-sans">
-      {/* Clean Bold Headline & Search */}
-      <div className="mb-10 pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
+      {/* Header & Search */}
+      <div className="mb-6 pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
         <div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[#F5F2EB] leading-tight">
             Exercises
           </h1>
-          <p className="text-xs font-sans text-[#A8A297] mt-2">
+          <p className="text-xs text-[#A8A297] mt-2">
             {exerciseSummaries.length === 0
-              ? 'No exercises recorded yet'
+              ? 'No exercises in this view'
               : `${exerciseSummaries.length} ${
                   exerciseSummaries.length === 1 ? 'exercise' : 'exercises'
-                } in archive`}
+                } recorded`}
           </p>
         </div>
 
         {/* Minimal Search Line */}
-        {exerciseSummaries.length > 0 && (
-          <div className="relative w-full sm:w-56">
-            <Search className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-[#706B62]" />
+        <div className="relative w-full sm:w-56">
+          <Search className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-[#706B62]" />
+          <input
+            type="text"
+            placeholder="Search exercise..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-transparent border-b border-[#383530] focus:border-[#CC6543] pl-6 pr-2 py-1.5 text-sm text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
+          />
+        </div>
+      </div>
+
+      {/* Workout Profiles Tabs (Clean, only present if profiles exist or user wants to add one) */}
+      <div className="mb-8 flex flex-wrap items-center gap-2">
+        {/* All Tab */}
+        <button
+          onClick={() => setSelectedProfile('all')}
+          className={`px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 ${
+            selectedProfile === 'all'
+              ? 'bg-[#CC6543] text-white font-bold shadow-sm'
+              : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-[#F5F2EB]'
+          }`}
+        >
+          All
+        </button>
+
+        {/* User-created profiles */}
+        {profiles.map((p) => (
+          <button
+            key={p}
+            onClick={() => setSelectedProfile(p)}
+            className={`px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 ${
+              selectedProfile === p
+                ? 'bg-[#CC6543] text-white font-bold shadow-sm'
+                : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-[#F5F2EB]'
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+
+        {/* Create Profile Button / Inline Form */}
+        {!isCreatingProfile ? (
+          <button
+            onClick={() => setIsCreatingProfile(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-[#252320]/60 border border-dashed border-[#4D4740] text-[#A8A297] hover:text-[#F5F2EB] hover:border-[#CC6543] transition-all"
+            title="Create a new workout profile (e.g. Armwrestling, Rehab, Gym)"
+          >
+            <Plus className="w-3 h-3 text-[#CC6543]" />
+            <span>New Profile</span>
+          </button>
+        ) : (
+          <form
+            onSubmit={handleCreateProfileSubmit}
+            className="inline-flex items-center gap-1.5 bg-[#252320] border border-[#CC6543] rounded-full px-3 py-1 animate-pop-in"
+          >
+            <Tag className="w-3 h-3 text-[#CC6543]" />
             <input
               type="text"
-              placeholder="Search exercise..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent border-b border-[#383530] focus:border-[#CC6543] pl-6 pr-2 py-1.5 text-sm font-sans text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
+              placeholder="Profile name (e.g. Rehab)..."
+              value={newProfileName}
+              onChange={(e) => setNewProfileName(e.target.value)}
+              autoFocus
+              className="bg-transparent text-xs text-[#F5F2EB] placeholder-[#524E48] focus:outline-none w-44"
             />
-          </div>
+            <button
+              type="submit"
+              className="text-[10px] uppercase font-bold text-[#CC6543] hover:text-[#DE7C5A] px-1"
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsCreatingProfile(false);
+                setNewProfileName('');
+              }}
+              className="text-[#706B62] hover:text-[#F5F2EB]"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </form>
         )}
       </div>
 
@@ -115,7 +216,9 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
       {exerciseSummaries.length === 0 ? (
         <div className="py-16 text-center animate-pop-in">
           <p className="text-base sm:text-lg text-[#C8C2B7] italic mb-6">
-            "Every journey begins with a single recorded rep."
+            {selectedProfile !== 'all'
+              ? `No exercises logged under "${selectedProfile}" yet.`
+              : '"Every journey begins with a single recorded rep."'}
           </p>
           <button
             onClick={onGoToLog}
@@ -135,10 +238,26 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
               className="group w-full py-6 text-left flex items-center justify-between gap-4 hover:translate-x-1 active:scale-[0.99] transition-all duration-200"
             >
               <div className="space-y-1.5 flex-1">
-                {/* Bold Sans Headline */}
-                <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F2EB] group-hover:text-claude-terracottaLight transition-colors">
-                  {item.name}
-                </h3>
+                <div className="flex items-center gap-2.5">
+                  {/* Bold Headline */}
+                  <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F2EB] group-hover:text-claude-terracottaLight transition-colors">
+                    {item.name}
+                  </h3>
+
+                  {/* Profile Tags (if assigned) */}
+                  {item.profiles.length > 0 && selectedProfile === 'all' && (
+                    <div className="flex flex-wrap gap-1">
+                      {item.profiles.map((pr) => (
+                        <span
+                          key={pr}
+                          className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#252320] border border-[#383530] text-[#CC6543]"
+                        >
+                          {pr}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {/* Clean Stats Row with d Month yyyy */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#A8A297]">

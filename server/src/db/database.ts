@@ -19,7 +19,7 @@ export class Database {
 
   public init(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const schema = `
+      const tableSql = `
         CREATE TABLE IF NOT EXISTS workouts (
           id TEXT PRIMARY KEY,
           exercise_name TEXT NOT NULL,
@@ -27,28 +27,40 @@ export class Database {
           reps INTEGER NOT NULL,
           rir REAL NOT NULL,
           weight REAL,
+          profile TEXT,
           date TEXT NOT NULL,
           notes TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
           is_deleted INTEGER DEFAULT 0
         );
-
-        CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
-        CREATE INDEX IF NOT EXISTS idx_workouts_exercise ON workouts(exercise_name);
-        CREATE INDEX IF NOT EXISTS idx_workouts_updated_at ON workouts(updated_at);
       `;
 
-      this.db.exec(schema, (err) => {
+      this.db.run(tableSql, (err) => {
         if (err) {
-          console.error('Failed to initialize database schema:', err);
+          console.error('Failed to create workouts table:', err);
           return reject(err);
         }
 
-        // Run auto-migration to add weight column if table was previously created without it
+        // Run auto-migrations for existing tables
         this.db.run(`ALTER TABLE workouts ADD COLUMN weight REAL`, () => {
-          // Ignore error if column already exists
-          resolve();
+          this.db.run(`ALTER TABLE workouts ADD COLUMN profile TEXT`, () => {
+            // Create indexes after columns are guaranteed to exist
+            const indexSql = `
+              CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
+              CREATE INDEX IF NOT EXISTS idx_workouts_exercise ON workouts(exercise_name);
+              CREATE INDEX IF NOT EXISTS idx_workouts_profile ON workouts(profile);
+              CREATE INDEX IF NOT EXISTS idx_workouts_updated_at ON workouts(updated_at);
+            `;
+
+            this.db.exec(indexSql, (indexErr) => {
+              if (indexErr) {
+                console.error('Failed to create indexes:', indexErr);
+                return reject(indexErr);
+              }
+              resolve();
+            });
+          });
         });
       });
     });
@@ -102,7 +114,7 @@ export class Database {
       if (incomingUpdated >= existingUpdated) {
         await this.run(
           `UPDATE workouts 
-           SET exercise_name = ?, sets = ?, reps = ?, rir = ?, weight = ?, date = ?, notes = ?, created_at = ?, updated_at = ?, is_deleted = ?
+           SET exercise_name = ?, sets = ?, reps = ?, rir = ?, weight = ?, profile = ?, date = ?, notes = ?, created_at = ?, updated_at = ?, is_deleted = ?
            WHERE id = ?`,
           [
             w.exercise_name,
@@ -110,6 +122,7 @@ export class Database {
             w.reps,
             w.rir,
             w.weight ?? null,
+            w.profile ?? null,
             w.date,
             w.notes || null,
             w.created_at,
@@ -121,8 +134,8 @@ export class Database {
       }
     } else {
       await this.run(
-        `INSERT INTO workouts (id, exercise_name, sets, reps, rir, weight, date, notes, created_at, updated_at, is_deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO workouts (id, exercise_name, sets, reps, rir, weight, profile, date, notes, created_at, updated_at, is_deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           w.id,
           w.exercise_name,
@@ -130,6 +143,7 @@ export class Database {
           w.reps,
           w.rir,
           w.weight ?? null,
+          w.profile ?? null,
           w.date,
           w.notes || null,
           w.created_at,
