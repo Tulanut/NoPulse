@@ -156,7 +156,7 @@ export class WorkoutController {
   public static healthCheck(_req: Request, res: Response): void {
     res.json({
       status: 'healthy',
-      service: 'IronPulse Gym Tracker API',
+      service: 'NoPulse Gym Tracker API',
       timestamp: new Date().toISOString(),
     });
   }

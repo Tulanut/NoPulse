@@ -84,10 +84,10 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
 
       {/* Foreground Content with Gentle Float */}
       <div className="relative z-10 animate-soft-float flex flex-col items-center max-w-3xl">
-        {/* Monumental IronPulse Title */}
+        {/* Monumental NoPulse Title */}
         <div className="space-y-4 mb-10">
           <h1 className="text-8xl sm:text-9xl md:text-[10rem] lg:text-[12rem] font-serif font-bold tracking-tight text-[#F5F2EB] leading-none transition-transform duration-300 hover:scale-[1.01]">
-            IronPulse
+            NoPulse
           </h1>
 
           {/* Pure Seamless Quote (No box, no background blur artifacts) */}

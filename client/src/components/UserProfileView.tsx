@@ -26,7 +26,7 @@ interface UserProfileViewProps {
 
 const DEFAULT_PROFILE: UserProfileData = {
   username: 'IronAthlete',
-  email: 'athlete@ironpulse.local',
+  email: 'athlete@nopulse.local',
   avatarUrl: null,
   bio: 'Consistency over intensity. Building strength daily.',
   memberSince: '2026-08-01',
@@ -65,7 +65,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
 }) => {
   // Load saved local profile or fallback to defaults
   const [profile, setProfile] = useState<UserProfileData>(() => {
-    const saved = localStorage.getItem('ironpulse_user_profile');
+    const saved = localStorage.getItem('nopulse_user_profile');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -216,12 +216,12 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     const updated: UserProfileData = {
       ...profile,
       username: usernameInput.trim() || 'IronAthlete',
-      email: emailInput.trim() || 'athlete@ironpulse.local',
+      email: emailInput.trim() || 'athlete@nopulse.local',
       bio: bioInput.trim(),
     };
 
     setProfile(updated);
-    localStorage.setItem('ironpulse_user_profile', JSON.stringify(updated));
+    localStorage.setItem('nopulse_user_profile', JSON.stringify(updated));
     setProfileSuccess(true);
     setTimeout(() => setProfileSuccess(false), 3000);
   };
@@ -241,7 +241,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     };
 
     setProfile(updated);
-    localStorage.setItem('ironpulse_user_profile', JSON.stringify(updated));
+    localStorage.setItem('nopulse_user_profile', JSON.stringify(updated));
     setSocialsSuccess(true);
     setTimeout(() => setSocialsSuccess(false), 3000);
   };
@@ -258,7 +258,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         avatarUrl: base64Url,
       };
       setProfile(updated);
-      localStorage.setItem('ironpulse_user_profile', JSON.stringify(updated));
+      localStorage.setItem('nopulse_user_profile', JSON.stringify(updated));
     };
     reader.readAsDataURL(file);
   };
@@ -269,7 +269,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       avatarUrl: null,
     };
     setProfile(updated);
-    localStorage.setItem('ironpulse_user_profile', JSON.stringify(updated));
+    localStorage.setItem('nopulse_user_profile', JSON.stringify(updated));
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
@@ -303,7 +303,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ironpulse-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `nopulse-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };

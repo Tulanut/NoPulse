@@ -1,4 +1,4 @@
-# IronPulse - Full-Stack Offline-First Gym Tracker
+# NoPulse - Full-Stack Offline-First Gym Tracker
 
 A production-grade, offline-first Gym Tracker web application designed with modern, high-demand web technologies (React 18, TypeScript, Tailwind CSS, Vite, Node.js/Express, IndexedDB, and SQLite).
 

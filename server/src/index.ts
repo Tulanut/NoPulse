@@ -23,7 +23,7 @@ app.use('/api', workoutRoutes);
 // Root greeting
 app.get('/', (_req, res) => {
   res.json({
-    message: 'IronPulse Gym Tracker API is running.',
+    message: 'NoPulse Gym Tracker API is running.',
     endpoints: {
       health: 'GET /api/health',
       workouts: 'GET /api/workouts',
@@ -38,7 +38,7 @@ async function startServer() {
   try {
     await db.init();
     app.listen(PORT, () => {
-      console.log(`🚀 IronPulse Gym Tracker Server listening on http://localhost:${PORT}`);
+      console.log(`🚀 NoPulse Gym Tracker Server listening on http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

@@ -113,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
         }`}
       >
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4 font-sans">
-          {/* Brand (The IronPulse Logo & Hover you liked - Preserved) */}
+          {/* Brand (The NoPulse Logo & Hover you liked - Preserved) */}
           <button
             onClick={() => {
               onNavigate('landing');
@@ -125,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
               <Dumbbell className="w-4 h-4 text-white" />
             </div>
             <h1 className="text-base sm:text-lg font-bold tracking-tight text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors">
-              IronPulse
+              NoPulse
             </h1>
           </button>
 

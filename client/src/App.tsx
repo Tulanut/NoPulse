@@ -164,7 +164,7 @@ export const App: React.FC = () => {
         <footer className="border-t border-claude-border bg-[#191816] py-4 px-4 text-center text-xs text-claude-textDim animate-fade-in">
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
             <span className="font-serif">
-              IronPulse &copy; {new Date().getFullYear()} — Minimalist Gym Tracker
+              NoPulse &copy; {new Date().getFullYear()} — Minimalist Gym Tracker
             </span>
             <div className="flex items-center gap-1.5 text-claude-textMuted font-sans text-[11px]">
               <ShieldCheck className="w-3.5 h-3.5 text-[#789D74]" />

@@ -1,6 +1,6 @@
-# IronPulse — Comprehensive Project History, Architecture & Learning Log
+# NoPulse — Comprehensive Project History, Architecture & Learning Log
 
-> **Purpose**: This living document serves as the master record of all implementation plans, architectural decisions, user design directives, bug analyses, and technical learnings across the entire lifecycle of the **IronPulse** minimalist gym tracker.
+> **Purpose**: This living document serves as the master record of all implementation plans, architectural decisions, user design directives, bug analyses, and technical learnings across the entire lifecycle of the **NoPulse** minimalist gym tracker.
 
 ---
 

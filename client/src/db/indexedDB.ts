@@ -1,6 +1,6 @@
 import { Workout } from '../types/workout';
 
-const DB_NAME = 'ironpulse_gym_db';
+const DB_NAME = 'nopulse_gym_db';
 const DB_VERSION = 1;
 const WORKOUTS_STORE = 'workouts';
 const METADATA_STORE = 'metadata';
