@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   // Auto-hide mouse tracking near top of window
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (e.clientY <= 35) {
+      if (e.clientY <= 40) {
         setIsRevealed(true);
         if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
       }
@@ -70,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
       setIsRevealed(false);
-    }, 1000);
+    }, 1200);
   };
 
   const formatTime = (isoString: string | null) => {
@@ -81,24 +81,24 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      {/* Top Hover Trigger Zone (Thin top edge) */}
+      {/* Top Hover Trigger Zone (Top edge) */}
       <div
         onMouseEnter={handleMouseEnter}
-        className="fixed top-0 left-0 right-0 h-4 z-40 pointer-events-auto"
+        className="fixed top-0 left-0 right-0 h-5 z-40 pointer-events-auto"
       />
 
-      {/* Subtle Hint Pull Tab when hidden */}
+      {/* Subtle Soft Pull Tab when hidden */}
       <div
         onMouseEnter={handleMouseEnter}
         className={`fixed top-0 left-1/2 -translate-x-1/2 z-30 transition-all duration-300 ${
           isRevealed
             ? 'opacity-0 -translate-y-full pointer-events-none'
-            : 'opacity-50 hover:opacity-100 cursor-pointer pointer-events-auto'
+            : 'opacity-60 hover:opacity-100 cursor-pointer pointer-events-auto'
         }`}
       >
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-b-xl bg-[#252320]/80 border-b border-x border-[#383530] text-[10px] font-sans text-[#A8A297] backdrop-blur-sm shadow-sm hover:text-[#F5F2EB] transition">
+        <div className="flex items-center gap-1.5 px-4 py-1 rounded-b-xl bg-[#201E1B]/90 border-b border-x border-[#33302B] text-[11px] font-sans text-[#A8A297] backdrop-blur-md shadow-lg shadow-black/20 hover:text-[#F5F2EB] hover:border-[#4D4740] transition-all">
           <span>navigation</span>
-          <ChevronDown className="w-3 h-3 text-[#CC6543]" />
+          <ChevronDown className="w-3.5 h-3.5 text-[#CC6543]" />
         </div>
       </div>
 
@@ -106,43 +106,43 @@ export const Header: React.FC<HeaderProps> = ({
       <header
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`fixed top-0 left-0 right-0 z-50 bg-[#191816]/95 backdrop-blur-md border-b border-claude-border px-4 py-2.5 shadow-xl transition-all duration-300 transform ${
+        className={`fixed top-0 left-0 right-0 z-50 bg-[#1A1816]/95 backdrop-blur-xl border-b border-[#2E2B26]/80 px-5 py-3 sm:py-3.5 shadow-2xl shadow-black/40 transition-all duration-300 transform ${
           isRevealed
             ? 'translate-y-0 opacity-100 pointer-events-auto'
             : '-translate-y-full opacity-0 pointer-events-none'
         }`}
       >
-        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3 font-sans">
-          {/* Brand (Click to go Home) */}
+        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4 font-sans">
+          {/* Brand (The IronPulse Logo & Hover you liked - Preserved) */}
           <button
             onClick={() => {
               onNavigate('landing');
               setIsRevealed(false);
             }}
-            className="flex items-center gap-2 text-left group active:scale-95 transition-all duration-200"
+            className="flex items-center gap-2.5 text-left group active:scale-95 transition-all duration-200"
           >
-            <div className="w-7 h-7 rounded-lg bg-[#CC6543] flex items-center justify-center shadow-md shadow-[#CC6543]/20 ring-1 ring-white/10 group-hover:bg-[#DE7C5A] group-hover:scale-105 transition-all duration-200">
-              <Dumbbell className="w-3.5 h-3.5 text-white" />
+            <div className="w-8 h-8 rounded-xl bg-[#CC6543] flex items-center justify-center shadow-md shadow-[#CC6543]/20 ring-1 ring-white/10 group-hover:bg-[#DE7C5A] group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-[#CC6543]/30 transition-all duration-200">
+              <Dumbbell className="w-4 h-4 text-white" />
             </div>
-            <h1 className="text-base font-bold tracking-tight text-claude-text group-hover:text-claude-terracottaLight transition-colors">
+            <h1 className="text-base sm:text-lg font-bold tracking-tight text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors">
               IronPulse
             </h1>
           </button>
 
-          {/* Minimal Navigation Pills */}
-          <nav className="flex items-center gap-1 bg-claude-surfaceDark border border-claude-border p-0.5 rounded-xl">
+          {/* Smooth, Soft Navigation Pills with Enhanced Spacing */}
+          <nav className="flex items-center gap-1.5 bg-[#22201D] border border-[#33302B] p-1 rounded-2xl shadow-inner shadow-black/20">
             <button
               onClick={() => {
                 onNavigate('landing');
                 setIsRevealed(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs active:scale-95 transition-all duration-200 ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs active:scale-95 transition-all duration-200 ${
                 currentScreen === 'landing'
-                  ? 'bg-claude-surface text-white shadow-sm font-semibold'
-                  : 'text-claude-textMuted hover:text-claude-text hover:bg-claude-surface/50'
+                  ? 'bg-[#2E2B26] text-[#F5F2EB] shadow-sm font-bold border border-[#44403A]'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
               }`}
             >
-              <Home className="w-3 h-3" />
+              <Home className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Home</span>
             </button>
 
@@ -151,13 +151,13 @@ export const Header: React.FC<HeaderProps> = ({
                 onNavigate('log');
                 setIsRevealed(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs active:scale-95 transition-all duration-200 ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs active:scale-95 transition-all duration-200 ${
                 currentScreen === 'log'
-                  ? 'bg-[#CC6543] text-white shadow-sm font-semibold'
-                  : 'text-claude-textMuted hover:text-claude-text hover:bg-claude-surface/50'
+                  ? 'bg-[#CC6543] text-white shadow-md shadow-[#CC6543]/25 font-bold'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
               }`}
             >
-              <PlusCircle className="w-3 h-3" />
+              <PlusCircle className="w-3.5 h-3.5" />
               <span>Add Log</span>
             </button>
 
@@ -166,13 +166,13 @@ export const Header: React.FC<HeaderProps> = ({
                 onNavigate('exercises');
                 setIsRevealed(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs active:scale-95 transition-all duration-200 ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs active:scale-95 transition-all duration-200 ${
                 currentScreen === 'exercises' || currentScreen === 'exercise-detail'
-                  ? 'bg-[#CC6543] text-white shadow-sm font-semibold'
-                  : 'text-claude-textMuted hover:text-claude-text hover:bg-claude-surface/50'
+                  ? 'bg-[#CC6543] text-white shadow-md shadow-[#CC6543]/25 font-bold'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
               }`}
             >
-              <Layers className="w-3 h-3" />
+              <Layers className="w-3.5 h-3.5" />
               <span>Exercises</span>
             </button>
 
@@ -181,22 +181,22 @@ export const Header: React.FC<HeaderProps> = ({
                 onNavigate('profile');
                 setIsRevealed(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs active:scale-95 transition-all duration-200 ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs active:scale-95 transition-all duration-200 ${
                 currentScreen === 'profile'
-                  ? 'bg-[#CC6543] text-white shadow-sm font-semibold'
-                  : 'text-claude-textMuted hover:text-claude-text hover:bg-claude-surface/50'
+                  ? 'bg-[#CC6543] text-white shadow-md shadow-[#CC6543]/25 font-bold'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
               }`}
             >
-              <User className="w-3 h-3" />
+              <User className="w-3.5 h-3.5" />
               <span>Profile</span>
             </button>
           </nav>
 
-          {/* Actions (Sync, Fullscreen, Offline Simulation) */}
-          <div className="flex items-center gap-2">
+          {/* Action Tools with Soft Dark Borders & Harmonized Gap */}
+          <div className="flex items-center gap-2.5">
             {/* Network pill */}
             <div
-              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-sans border transition-all duration-200 ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all duration-200 ${
                 isOnline
                   ? 'bg-[#789D74]/15 text-[#B8D4B5] border-[#789D74]/30'
                   : 'bg-[#E08E45]/15 text-[#F0BD85] border-[#E08E45]/30'
@@ -218,30 +218,30 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {pendingSyncCount > 0 && (
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] bg-[#CC6543]/15 text-[#E59B80] border border-[#CC6543]/30 font-sans animate-pop-in">
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-[#CC6543]/15 text-[#E59B80] border border-[#CC6543]/30 font-semibold animate-pop-in">
                 <AlertCircle className="w-3 h-3" />
                 <span>{pendingSyncCount}</span>
               </div>
             )}
 
-            {/* Sync */}
+            {/* Sync Button */}
             <button
               onClick={onManualSync}
               disabled={syncState === 'syncing' || !isOnline}
-              className="p-1 rounded-lg bg-claude-surface hover:bg-claude-surfaceHover hover:scale-105 active:scale-95 disabled:opacity-40 text-claude-textMuted hover:text-claude-text border border-claude-border transition-all duration-200"
+              className="p-1.5 rounded-xl bg-[#22201D] hover:bg-[#2E2B26] hover:border-[#4D4740] hover:scale-105 active:scale-95 disabled:opacity-40 text-[#A8A297] hover:text-[#F5F2EB] border border-[#33302B] transition-all duration-200"
               title={lastSyncedAt ? `Last Synced: ${formatTime(lastSyncedAt)}` : 'Sync Database'}
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 ${
-                  syncState === 'syncing' ? 'animate-spin text-claude-terracotta' : ''
+                  syncState === 'syncing' ? 'animate-spin text-[#CC6543]' : ''
                 }`}
               />
             </button>
 
-            {/* Fullscreen Toggle Button */}
+            {/* Fullscreen Button */}
             <button
               onClick={onToggleFullscreen}
-              className="p-1 rounded-lg bg-claude-surface hover:bg-claude-surfaceHover hover:scale-105 active:scale-95 text-claude-textMuted hover:text-claude-text border border-claude-border transition-all duration-200"
+              className="p-1.5 rounded-xl bg-[#22201D] hover:bg-[#2E2B26] hover:border-[#4D4740] hover:scale-105 active:scale-95 text-[#A8A297] hover:text-[#F5F2EB] border border-[#33302B] transition-all duration-200"
               title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
             >
               {isFullscreen ? (
@@ -254,14 +254,14 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Offline Simulation Toggle */}
             <button
               onClick={toggleSimulateOffline}
-              className={`px-2 py-0.5 rounded-lg text-[10px] font-sans border active:scale-95 transition-all duration-200 ${
+              className={`px-2.5 py-1 rounded-xl text-[10px] border active:scale-95 transition-all duration-200 ${
                 simulatedOffline
                   ? 'bg-[#E08E45]/20 text-[#F0BD85] border-[#E08E45]/50'
-                  : 'bg-claude-surfaceDark text-claude-textDim border-claude-border hover:text-claude-text hover:border-claude-borderHover'
+                  : 'bg-[#22201D] text-[#706B62] border-[#33302B] hover:text-[#F5F2EB] hover:border-[#4D4740]'
               }`}
               title="Toggle simulated offline state"
             >
-              <Database className="w-3 h-3 inline mr-1" />
+              <Database className="w-3 h-3 inline mr-1 text-[#CC6543]" />
               <span className="hidden sm:inline">
                 {simulatedOffline ? 'Online' : 'Offline'}
               </span>

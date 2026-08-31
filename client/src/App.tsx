@@ -83,7 +83,7 @@ export const App: React.FC = () => {
         className={`flex-1 w-full max-w-5xl mx-auto px-4 ${
           currentScreen === 'landing'
             ? 'flex flex-col justify-center py-6'
-            : 'pt-16 sm:pt-20 pb-16'
+            : 'pt-20 sm:pt-24 pb-16'
         }`}
       >
         {/* Offline Banner if Offline */}
