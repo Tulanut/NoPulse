@@ -75,22 +75,37 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
     setIsSubmitting(true);
 
     try {
+      // Automatically resolve profile: if user typed a new profile, create and assign it directly
+      let effectiveProfile: string | null = selectedProfile;
+      if (isCreatingProfile && newProfileName.trim()) {
+        const trimmed = newProfileName.trim();
+        if (onCreateProfile) {
+          effectiveProfile = await onCreateProfile(trimmed);
+        } else {
+          effectiveProfile = trimmed;
+        }
+        setSelectedProfile(effectiveProfile);
+        setIsCreatingProfile(false);
+        setNewProfileName('');
+      }
+
       const loggedName = exerciseName.trim();
       const parsedWeight = weight.trim() !== '' ? parseFloat(weight) : null;
 
+      // Save directly with the chosen/created profile
       await onAddWorkout({
         exercise_name: loggedName,
         sets,
         reps,
         rir,
         weight: parsedWeight,
-        profile: selectedProfile,
+        profile: effectiveProfile,
         date: effectiveDate,
         notes: notes.trim() || undefined,
       });
 
       setLastLoggedName(loggedName);
-      setLastLoggedProfile(selectedProfile);
+      setLastLoggedProfile(effectiveProfile);
       setSuccessMessage(true);
       setTimeout(() => setSuccessMessage(false), 3500);
       setNotes('');
@@ -140,11 +155,11 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           <div className="flex items-center gap-2.5">
             <Check className="w-5 h-5 text-[#789D74]" />
             <span>
-              <strong className="font-bold text-white text-base">{lastLoggedName}</strong> saved
+              <strong className="font-bold text-white text-base">{lastLoggedName}</strong> saved directly into{' '}
               {lastLoggedProfile ? (
-                <span className="text-white/80 font-normal"> into <strong className="font-semibold text-[#F5F2EB]">{lastLoggedProfile}</strong></span>
+                <strong className="font-semibold text-white underline">{lastLoggedProfile}</strong>
               ) : (
-                <span className="text-white/80 font-normal"> into <span className="text-[#A8A297]">General Exercises</span></span>
+                <span className="text-[#A8A297]">General Exercises</span>
               )}.
             </span>
           </div>
@@ -198,11 +213,11 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           />
         </div>
 
-        {/* Field 3: Add Profile Section (Choose to make or not) */}
+        {/* Field 3: Workout Profile Section (Pick or create on the fly) */}
         <div className="space-y-3 border-b border-[#383530]/60 pb-7">
           <div className="flex items-center justify-between">
             <label className="block text-xs tracking-widest uppercase text-[#A8A297] font-medium">
-              Workout Profile
+              Save To Workout Profile
             </label>
             {selectedProfile && (
               <button
@@ -219,9 +234,12 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
             {/* None / General (Default) */}
             <button
               type="button"
-              onClick={() => setSelectedProfile(null)}
+              onClick={() => {
+                setSelectedProfile(null);
+                setIsCreatingProfile(false);
+              }}
               className={`px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 ${
-                selectedProfile === null
+                selectedProfile === null && !isCreatingProfile
                   ? 'bg-[#383530] text-white font-bold shadow-sm'
                   : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-[#F5F2EB]'
               }`}
@@ -231,12 +249,15 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
 
             {/* Existing user-created profiles */}
             {profiles.map((p) => {
-              const isSelected = selectedProfile === p;
+              const isSelected = selectedProfile === p && !isCreatingProfile;
               return (
                 <button
                   key={p}
                   type="button"
-                  onClick={() => setSelectedProfile(p)}
+                  onClick={() => {
+                    setSelectedProfile(p);
+                    setIsCreatingProfile(false);
+                  }}
                   className={`px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 ${
                     isSelected
                       ? 'bg-[#CC6543] text-white font-bold shadow-sm'
@@ -253,7 +274,10 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
               !isCreatingProfile ? (
                 <button
                   type="button"
-                  onClick={() => setIsCreatingProfile(true)}
+                  onClick={() => {
+                    setIsCreatingProfile(true);
+                    setSelectedProfile(null);
+                  }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-[#252320]/60 border border-dashed border-[#4D4740] text-[#A8A297] hover:text-[#F5F2EB] hover:border-[#CC6543] transition-all"
                 >
                   <FolderPlus className="w-3.5 h-3.5 text-[#CC6543]" />
@@ -263,11 +287,11 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
                 <div className="inline-flex items-center gap-1.5 bg-[#252320] border border-[#CC6543] rounded-full px-3 py-1 animate-pop-in">
                   <input
                     type="text"
-                    placeholder="Profile name (e.g. Armwrestling)..."
+                    placeholder="Type profile name (e.g. Armwrestling)..."
                     value={newProfileName}
                     onChange={(e) => setNewProfileName(e.target.value)}
                     autoFocus
-                    className="bg-transparent text-xs text-[#F5F2EB] placeholder-[#524E48] focus:outline-none w-48"
+                    className="bg-transparent text-xs text-[#F5F2EB] placeholder-[#524E48] focus:outline-none w-56"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();

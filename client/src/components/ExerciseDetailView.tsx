@@ -136,6 +136,20 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
     setIsSubmitting(true);
 
     try {
+      // Auto-resolve profile on submit
+      let effectiveProfile: string | null = selectedProfile;
+      if (isCreatingProfile && newProfileName.trim()) {
+        const trimmed = newProfileName.trim();
+        if (onCreateProfile) {
+          effectiveProfile = await onCreateProfile(trimmed);
+        } else {
+          effectiveProfile = trimmed;
+        }
+        setSelectedProfile(effectiveProfile);
+        setIsCreatingProfile(false);
+        setNewProfileName('');
+      }
+
       const parsedWeight = weight.trim() !== '' ? parseFloat(weight) : null;
       await onAddWorkout({
         exercise_name: exerciseName,
@@ -143,7 +157,7 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
         reps,
         rir,
         weight: parsedWeight,
-        profile: selectedProfile,
+        profile: effectiveProfile,
         date: effectiveDate,
         notes: notes.trim() || undefined,
       });
