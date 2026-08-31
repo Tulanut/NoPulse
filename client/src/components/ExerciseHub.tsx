@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowRight, Plus, Search, Folder, ArrowLeft } from 'lucide-react';
+import { ArrowRight, Plus, Search, Folder, ArrowLeft, Trash2 } from 'lucide-react';
 import { Workout } from '../types/workout';
 import { formatSpelledDate } from '../utils/dateUtils';
 
@@ -7,6 +7,8 @@ interface ExerciseHubProps {
   workouts: Workout[];
   profiles: string[];
   onCreateProfile: (name: string) => Promise<string>;
+  onDeleteProfile?: (profileName: string) => Promise<void> | void;
+  onDeleteExercise?: (exerciseName: string, profile?: string) => Promise<void> | void;
   onSelectExercise: (exerciseName: string) => void;
   onGoToLog: () => void;
   onGoHome: () => void;
@@ -27,11 +29,15 @@ interface ExerciseSummary {
 export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   workouts,
   profiles,
+  onDeleteProfile,
+  onDeleteExercise,
   onSelectExercise,
   onGoToLog,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
+  const [deleteConfirmProfile, setDeleteConfirmProfile] = useState<string | null>(null);
+  const [deleteConfirmExercise, setDeleteConfirmExercise] = useState<string | null>(null);
 
   // Group workouts by exercise name helper
   const groupExercises = (workoutList: Workout[]): ExerciseSummary[] => {
@@ -140,6 +146,35 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     );
   }, [currentSummaries, searchQuery]);
 
+  const handleDeleteProfileClick = (e: React.MouseEvent, profileName: string) => {
+    e.stopPropagation();
+    setDeleteConfirmProfile(profileName);
+  };
+
+  const handleConfirmDeleteProfile = async (e: React.MouseEvent, profileName: string) => {
+    e.stopPropagation();
+    if (onDeleteProfile) {
+      await onDeleteProfile(profileName);
+      if (activeProfile === profileName) {
+        setActiveProfile(null);
+      }
+    }
+    setDeleteConfirmProfile(null);
+  };
+
+  const handleDeleteExerciseClick = (e: React.MouseEvent, exerciseName: string) => {
+    e.stopPropagation();
+    setDeleteConfirmExercise(exerciseName);
+  };
+
+  const handleConfirmDeleteExercise = async (e: React.MouseEvent, exerciseName: string) => {
+    e.stopPropagation();
+    if (onDeleteExercise) {
+      await onDeleteExercise(exerciseName, activeProfile || undefined);
+    }
+    setDeleteConfirmExercise(null);
+  };
+
   // -------------------------------------------------------------
   // VIEW 1: DRILLDOWN INTO A SPECIFIC WORKOUT PROFILE
   // -------------------------------------------------------------
@@ -165,7 +200,40 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
               <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-[#F5F2EB]">
                 {activeProfile}
               </h1>
+
+              {/* Profile Delete in Drilldown Header */}
+              {onDeleteProfile && (
+                deleteConfirmProfile === activeProfile ? (
+                  <div className="flex items-center gap-2 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-3 py-1 rounded-full animate-pop-in ml-2">
+                    <span className="text-[11px] text-[#F5B5B5] font-semibold">Delete Profile?</span>
+                    <button
+                      onClick={(e) => handleConfirmDeleteProfile(e, activeProfile)}
+                      className="text-[11px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmProfile(null);
+                      }}
+                      className="text-[11px] text-[#A8A297] hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => handleDeleteProfileClick(e, activeProfile)}
+                    className="p-1.5 rounded-lg text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors ml-1"
+                    title={`Delete "${activeProfile}" profile`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )
+              )}
             </div>
+
             <p className="text-xs text-[#A8A297] mt-2">
               {filteredSummaries.length === 0
                 ? 'No exercises recorded in this profile'
@@ -207,12 +275,14 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         ) : (
           <div className="divide-y divide-[#2E2B26]">
             {filteredSummaries.map((item) => (
-              <button
+              <div
                 key={item.name}
-                onClick={() => onSelectExercise(item.name)}
-                className="group w-full py-6 text-left flex items-center justify-between gap-4 hover:translate-x-1 active:scale-[0.99] transition-all duration-200"
+                className="py-6 flex items-center justify-between gap-4 hover:translate-x-1 transition-all duration-200 group"
               >
-                <div className="space-y-1.5 flex-1">
+                <button
+                  onClick={() => onSelectExercise(item.name)}
+                  className="space-y-1.5 flex-1 text-left"
+                >
                   <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F2EB] group-hover:text-claude-terracottaLight transition-colors">
                     {item.name}
                   </h3>
@@ -240,12 +310,49 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
                       </>
                     )}
                   </div>
-                </div>
+                </button>
 
-                <div className="w-10 h-10 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all duration-200 shrink-0">
-                  <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                {/* Actions: Delete Exercise & View Arrow */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {onDeleteExercise && (
+                    deleteConfirmExercise === item.name ? (
+                      <div className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2.5 py-1 rounded-full animate-pop-in">
+                        <span className="text-[10px] text-[#F5B5B5]">Delete?</span>
+                        <button
+                          onClick={(e) => handleConfirmDeleteExercise(e, item.name)}
+                          className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmExercise(null);
+                          }}
+                          className="text-[10px] text-[#A8A297] hover:text-white"
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => handleDeleteExerciseClick(e, item.name)}
+                        className="p-2 rounded-full text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors"
+                        title={`Delete ${item.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    onClick={() => onSelectExercise(item.name)}
+                    className="w-10 h-10 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all duration-200"
+                  >
+                    <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                  </button>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
@@ -255,7 +362,7 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
 
   // -------------------------------------------------------------
   // VIEW 2: GENERAL EXERCISES HUB
-  // (Shows Profile Boxes if profiles exist + usual exercises list)
+  // (Shows Profile Boxes with delete option + General exercises list with delete option)
   // -------------------------------------------------------------
   return (
     <div className="min-h-[85vh] flex flex-col justify-center max-w-3xl mx-auto px-4 py-8 select-none animate-slide-up font-sans space-y-10">
@@ -287,7 +394,7 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         )}
       </div>
 
-      {/* SECTION 1: WORKOUT PROFILE BOXES (Only shown if user has created profiles) */}
+      {/* SECTION 1: WORKOUT PROFILE BOXES (With clear Delete Profile option) */}
       {profileCards.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -298,21 +405,20 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {profileCards.map((p) => (
-              <button
+              <div
                 key={p.name}
                 onClick={() => {
                   setActiveProfile(p.name);
                   setSearchQuery('');
                 }}
-                className="group text-left p-5 rounded-2xl bg-[#252320]/80 border border-[#383530] hover:border-[#CC6543] hover:bg-[#252320] transition-all flex items-center justify-between gap-4 active:scale-[0.99]"
+                className="group relative text-left p-5 rounded-2xl bg-[#252320]/80 border border-[#383530] hover:border-[#CC6543] hover:bg-[#252320] transition-all flex items-center justify-between gap-4 cursor-pointer active:scale-[0.99]"
               >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-[#CC6543]/15 text-[#CC6543] group-hover:bg-[#CC6543] group-hover:text-white flex items-center justify-center transition-all">
+                <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-[#CC6543]/15 text-[#CC6543] group-hover:bg-[#CC6543] group-hover:text-white flex items-center justify-center transition-all shrink-0">
                     <Folder className="w-5 h-5" />
                   </div>
-                  <div>
-                    {/* The name of profile */}
-                    <h3 className="text-xl font-bold text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors">
+                  <div className="truncate">
+                    <h3 className="text-xl font-bold text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors truncate">
                       {p.name}
                     </h3>
                     <p className="text-xs text-[#A8A297] mt-0.5">
@@ -321,16 +427,53 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
                   </div>
                 </div>
 
-                <div className="w-8 h-8 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all">
-                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                {/* Right controls: Delete Profile + Arrow */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {onDeleteProfile && (
+                    deleteConfirmProfile === p.name ? (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2 py-1 rounded-full animate-pop-in"
+                      >
+                        <span className="text-[10px] text-[#F5B5B5]">Delete?</span>
+                        <button
+                          onClick={(e) => handleConfirmDeleteProfile(e, p.name)}
+                          className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmProfile(null);
+                          }}
+                          className="text-[10px] text-[#A8A297] hover:text-white"
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => handleDeleteProfileClick(e, p.name)}
+                        className="p-1.5 rounded-lg text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors opacity-70 group-hover:opacity-100"
+                        title={`Delete ${p.name} profile`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )
+                  )}
+
+                  <div className="w-8 h-8 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all">
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                  </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* SECTION 2: EXERCISES LIST (Direct / Uncategorized or All if no profiles) */}
+      {/* SECTION 2: GENERAL EXERCISES LIST (With clear Delete Exercise option) */}
       <div className="space-y-4 pt-2">
         {profileCards.length > 0 && currentSummaries.length > 0 && (
           <span className="text-xs uppercase tracking-widest text-[#A8A297] font-semibold block">
@@ -355,15 +498,17 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         ) : filteredSummaries.length === 0 ? (
           <p className="text-xs text-[#706B62] py-4">No standalone exercises found.</p>
         ) : (
-          /* Minimalist Editorial Exercise List with d Month yyyy Spelled Date */
+          /* Minimalist Editorial Exercise List with d Month yyyy Spelled Date and Delete */
           <div className="divide-y divide-[#2E2B26]">
             {filteredSummaries.map((item) => (
-              <button
+              <div
                 key={item.name}
-                onClick={() => onSelectExercise(item.name)}
-                className="group w-full py-6 text-left flex items-center justify-between gap-4 hover:translate-x-1 active:scale-[0.99] transition-all duration-200"
+                className="py-6 flex items-center justify-between gap-4 hover:translate-x-1 transition-all duration-200 group"
               >
-                <div className="space-y-1.5 flex-1">
+                <button
+                  onClick={() => onSelectExercise(item.name)}
+                  className="space-y-1.5 flex-1 text-left"
+                >
                   <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F2EB] group-hover:text-claude-terracottaLight transition-colors">
                     {item.name}
                   </h3>
@@ -391,12 +536,49 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
                       </>
                     )}
                   </div>
-                </div>
+                </button>
 
-                <div className="w-10 h-10 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all duration-200 shrink-0">
-                  <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                {/* Actions: Delete Exercise + Arrow */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {onDeleteExercise && (
+                    deleteConfirmExercise === item.name ? (
+                      <div className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2.5 py-1 rounded-full animate-pop-in">
+                        <span className="text-[10px] text-[#F5B5B5]">Delete?</span>
+                        <button
+                          onClick={(e) => handleConfirmDeleteExercise(e, item.name)}
+                          className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmExercise(null);
+                          }}
+                          className="text-[10px] text-[#A8A297] hover:text-white"
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => handleDeleteExerciseClick(e, item.name)}
+                        className="p-2 rounded-full text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors opacity-70 group-hover:opacity-100"
+                        title={`Delete ${item.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    onClick={() => onSelectExercise(item.name)}
+                    className="w-10 h-10 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all duration-200"
+                  >
+                    <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                  </button>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}

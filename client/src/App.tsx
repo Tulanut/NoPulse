@@ -13,6 +13,8 @@ export const App: React.FC = () => {
     allWorkouts,
     profiles,
     createProfile,
+    deleteProfile,
+    deleteExercise,
     syncState,
     lastSyncedAt,
     pendingSyncCount,
@@ -121,6 +123,8 @@ export const App: React.FC = () => {
               workouts={allWorkouts}
               profiles={profiles}
               onCreateProfile={createProfile}
+              onDeleteProfile={deleteProfile}
+              onDeleteExercise={deleteExercise}
               onSelectExercise={handleSelectExercise}
               onGoToLog={() => setCurrentScreen('log')}
               onGoHome={handleGoHome}

@@ -101,15 +101,32 @@ export function useWorkouts() {
     [customProfiles]
   );
 
-  // Delete a profile
+  // Delete a profile (removes profile and unassigns from workouts)
   const deleteProfile = useCallback(
     async (profileName: string) => {
       const trimmed = profileName.trim();
       const updated = customProfiles.filter((p) => p !== trimmed);
       setCustomProfiles(updated);
       await localDB.saveCustomProfiles(updated);
+
+      // Unassign profile from matching workouts
+      const workoutsWithProfile = workouts.filter((w) => w.profile === trimmed);
+      for (const w of workoutsWithProfile) {
+        await localDB.saveWorkout({
+          ...w,
+          profile: null,
+          sync_status: 'pending',
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
     },
-    [customProfiles]
+    [customProfiles, workouts, network.isOnline, refreshLocalWorkouts]
   );
 
   // Add a new workout log
@@ -162,7 +179,7 @@ export function useWorkouts() {
     [customProfiles, network.isOnline, refreshLocalWorkouts]
   );
 
-  // Delete a workout
+  // Delete a single workout entry by ID
   const deleteWorkout = useCallback(
     async (id: string) => {
       await localDB.deleteWorkout(id);
@@ -173,6 +190,29 @@ export function useWorkouts() {
       }
     },
     [network.isOnline, refreshLocalWorkouts]
+  );
+
+  // Delete all entries for an exercise (optionally scoped to a profile)
+  const deleteExercise = useCallback(
+    async (exerciseName: string, profile?: string) => {
+      const toDelete = workouts.filter((w) => {
+        const nameMatches = w.exercise_name.toLowerCase() === exerciseName.toLowerCase();
+        if (profile) {
+          return nameMatches && w.profile === profile;
+        }
+        return nameMatches;
+      });
+
+      for (const w of toDelete) {
+        await localDB.deleteWorkout(w.id);
+      }
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+    },
+    [workouts, network.isOnline, refreshLocalWorkouts]
   );
 
   // Manual sync trigger
@@ -233,6 +273,7 @@ export function useWorkouts() {
     profiles,
     createProfile,
     deleteProfile,
+    deleteExercise,
     loading,
     syncState,
     lastSyncedAt,
