@@ -13,14 +13,20 @@ import {
   Maximize,
   Minimize,
   ChevronDown,
+  ChevronRight,
+  PanelLeft,
+  PanelTop,
 } from 'lucide-react';
 import { SyncState } from '../services/syncService';
 
 export type ScreenState = 'landing' | 'log' | 'exercises' | 'exercise-detail' | 'profile';
+export type NavPosition = 'top' | 'side';
 
 interface HeaderProps {
   currentScreen: ScreenState;
   onNavigate: (screen: ScreenState) => void;
+  navPosition: NavPosition;
+  onToggleNavPosition: () => void;
   isOnline: boolean;
   simulatedOffline: boolean;
   toggleSimulateOffline: () => void;
@@ -35,6 +41,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentScreen,
   onNavigate,
+  navPosition,
+  onToggleNavPosition,
   isOnline,
   simulatedOffline,
   toggleSimulateOffline,
@@ -48,18 +56,25 @@ export const Header: React.FC<HeaderProps> = ({
   const [isRevealed, setIsRevealed] = useState(false);
   const hideTimerRef = useRef<number | null>(null);
 
-  // Auto-hide mouse tracking near top of window
+  // Auto-hide tracking: top edge for 'top', left edge for 'side'
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (e.clientY <= 40) {
-        setIsRevealed(true);
-        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      if (navPosition === 'top') {
+        if (e.clientY <= 40) {
+          setIsRevealed(true);
+          if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        }
+      } else {
+        if (e.clientX <= 45) {
+          setIsRevealed(true);
+          if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        }
       }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [navPosition]);
 
   const handleMouseEnter = () => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
@@ -79,9 +94,184 @@ export const Header: React.FC<HeaderProps> = ({
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // =========================================================================
+  // 1. SIDE POSITION NAVIGATION
+  // =========================================================================
+  if (navPosition === 'side') {
+    return (
+      <>
+        {/* Left Hover Trigger Zone */}
+        <div
+          onMouseEnter={handleMouseEnter}
+          className="fixed top-0 bottom-0 left-0 w-5 z-40 pointer-events-auto"
+        />
+
+        {/* Subtle Pull Tab on the Left Edge when hidden */}
+        <div
+          onMouseEnter={handleMouseEnter}
+          className={`fixed top-1/2 left-0 -translate-y-1/2 z-30 transition-all duration-300 ${
+            isRevealed
+              ? 'opacity-0 -translate-x-full pointer-events-none'
+              : 'opacity-60 hover:opacity-100 cursor-pointer pointer-events-auto'
+          }`}
+        >
+          <div className="flex flex-col items-center gap-1.5 px-1.5 py-4 rounded-r-2xl bg-[#201E1B]/90 border-r border-y border-[#33302B] text-[10px] font-sans text-[#A8A297] backdrop-blur-md shadow-2xl shadow-black/40 hover:text-[#F5F2EB] hover:border-[#4D4740] transition-all">
+            <span className="[writing-mode:vertical-lr] tracking-widest uppercase text-[9px]">menu</span>
+            <ChevronRight className="w-3.5 h-3.5 text-[#CC6543] mt-1" />
+          </div>
+        </div>
+
+        {/* Floating Side Navigation Bar */}
+        <aside
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className={`fixed top-0 bottom-0 left-0 z-50 w-20 sm:w-24 bg-[#1A1816]/95 backdrop-blur-xl border-r border-[#2E2B26]/80 py-6 px-2.5 flex flex-col justify-between items-center shadow-2xl shadow-black/50 transition-all duration-300 transform ${
+            isRevealed
+              ? 'translate-x-0 opacity-100 pointer-events-auto'
+              : '-translate-x-full opacity-0 pointer-events-none'
+          }`}
+        >
+          {/* Top: NoPulse Brand with beloved hover */}
+          <button
+            onClick={() => {
+              onNavigate('landing');
+              setIsRevealed(false);
+            }}
+            className="flex flex-col items-center gap-1.5 text-center group active:scale-95 transition-all duration-200"
+            title="NoPulse Home"
+          >
+            <div className="w-9 h-9 rounded-xl bg-[#CC6543] flex items-center justify-center shadow-md shadow-[#CC6543]/20 ring-1 ring-white/10 group-hover:bg-[#DE7C5A] group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-[#CC6543]/30 transition-all duration-200">
+              <Dumbbell className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-[11px] font-bold tracking-tight text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors">
+              NoPulse
+            </span>
+          </button>
+
+          {/* Center: Vertical Navigation Buttons */}
+          <nav className="flex flex-col items-center gap-2 bg-[#22201D] border border-[#33302B] p-1.5 rounded-2xl shadow-inner shadow-black/20 w-full">
+            <button
+              onClick={() => {
+                onNavigate('landing');
+                setIsRevealed(false);
+              }}
+              className={`flex flex-col items-center justify-center gap-1 w-full py-2.5 rounded-xl text-[10px] active:scale-95 transition-all duration-200 ${
+                currentScreen === 'landing'
+                  ? 'bg-[#2E2B26] text-[#F5F2EB] font-bold border border-[#44403A] shadow-sm'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
+              }`}
+              title="Home"
+            >
+              <Home className="w-4 h-4" />
+              <span>Home</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('log');
+                setIsRevealed(false);
+              }}
+              className={`flex flex-col items-center justify-center gap-1 w-full py-2.5 rounded-xl text-[10px] active:scale-95 transition-all duration-200 ${
+                currentScreen === 'log'
+                  ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/25'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
+              }`}
+              title="Add Log"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Add Log</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('exercises');
+                setIsRevealed(false);
+              }}
+              className={`flex flex-col items-center justify-center gap-1 w-full py-2.5 rounded-xl text-[10px] active:scale-95 transition-all duration-200 ${
+                currentScreen === 'exercises' || currentScreen === 'exercise-detail'
+                  ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/25'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
+              }`}
+              title="Exercises"
+            >
+              <Layers className="w-4 h-4" />
+              <span>Exercises</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('profile');
+                setIsRevealed(false);
+              }}
+              className={`flex flex-col items-center justify-center gap-1 w-full py-2.5 rounded-xl text-[10px] active:scale-95 transition-all duration-200 ${
+                currentScreen === 'profile'
+                  ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/25'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
+              }`}
+              title="Profile"
+            >
+              <User className="w-4 h-4" />
+              <span>Profile</span>
+            </button>
+          </nav>
+
+          {/* Bottom: Utilities & Minimalist Borderless Position Switch */}
+          <div className="flex flex-col items-center gap-2.5 w-full">
+            {/* Borderless Minimalist Nav Position Toggle */}
+            <button
+              onClick={onToggleNavPosition}
+              className="p-2 rounded-xl text-[#A8A297] hover:text-[#CC6543] hover:bg-[#2E2B26]/60 transition-all duration-200"
+              title="Switch to Top Navigation"
+            >
+              <PanelTop className="w-4 h-4" />
+            </button>
+
+            {/* Sync Button */}
+            <button
+              onClick={onManualSync}
+              disabled={syncState === 'syncing' || !isOnline}
+              className="p-2 rounded-xl bg-[#22201D] hover:bg-[#2E2B26] text-[#A8A297] hover:text-[#F5F2EB] border border-[#33302B] active:scale-95 disabled:opacity-40 transition-all"
+              title={lastSyncedAt ? `Last Synced: ${formatTime(lastSyncedAt)}` : 'Sync Database'}
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${
+                  syncState === 'syncing' ? 'animate-spin text-[#CC6543]' : ''
+                }`}
+              />
+            </button>
+
+            {/* Fullscreen Button */}
+            <button
+              onClick={onToggleFullscreen}
+              className="p-2 rounded-xl bg-[#22201D] hover:bg-[#2E2B26] text-[#A8A297] hover:text-[#F5F2EB] border border-[#33302B] active:scale-95 transition-all"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {/* Network indicator */}
+            <div
+              className={`w-2.5 h-2.5 rounded-full ${
+                isOnline ? 'bg-[#789D74]' : 'bg-[#E08E45]'
+              }`}
+              title={isOnline ? 'Online' : 'Offline'}
+            />
+          </div>
+        </aside>
+      </>
+    );
+  }
+
+  // =========================================================================
+  // 2. TOP POSITION NAVIGATION (DEFAULT)
+  // =========================================================================
   return (
     <>
-      {/* Top Hover Trigger Zone (Top edge) */}
+      {/* Top Hover Trigger Zone */}
       <div
         onMouseEnter={handleMouseEnter}
         className="fixed top-0 left-0 right-0 h-5 z-40 pointer-events-auto"
@@ -102,7 +292,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Auto-Hiding Floating Navigation Header */}
+      {/* Auto-Hiding Floating Top Navigation Header */}
       <header
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -113,7 +303,7 @@ export const Header: React.FC<HeaderProps> = ({
         }`}
       >
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4 font-sans">
-          {/* Brand (The NoPulse Logo & Hover you liked - Preserved) */}
+          {/* Brand (The NoPulse Logo & Hover) */}
           <button
             onClick={() => {
               onNavigate('landing');
@@ -192,8 +382,17 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* Action Tools with Soft Dark Borders & Harmonized Gap */}
-          <div className="flex items-center gap-2.5">
+          {/* Action Tools with Minimalist Borderless Position Switch */}
+          <div className="flex items-center gap-2">
+            {/* Borderless Minimalist Nav Position Switch */}
+            <button
+              onClick={onToggleNavPosition}
+              className="p-1.5 rounded-xl text-[#A8A297] hover:text-[#CC6543] hover:bg-[#2E2B26]/60 transition-all duration-200"
+              title="Switch to Side Navigation"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+
             {/* Network pill */}
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all duration-200 ${

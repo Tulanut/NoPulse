@@ -14,13 +14,19 @@ import {
   Music,
   ExternalLink,
   Share2,
+  PanelTop,
+  PanelLeft,
+  Sliders,
 } from 'lucide-react';
 import { Workout } from '../types/workout';
 import { UserProfileData, UserSocials } from '../types/user';
+import { NavPosition } from './Header';
 import { formatSpelledDate } from '../utils/dateUtils';
 
 interface UserProfileViewProps {
   workouts: Workout[];
+  navPosition?: NavPosition;
+  onToggleNavPosition?: () => void;
   onBackToHome: () => void;
 }
 
@@ -62,6 +68,8 @@ function formatSocialLink(platform: keyof UserSocials, input?: string): string |
 
 export const UserProfileView: React.FC<UserProfileViewProps> = ({
   workouts,
+  navPosition = 'top',
+  onToggleNavPosition,
 }) => {
   // Load saved local profile or fallback to defaults
   const [profile, setProfile] = useState<UserProfileData>(() => {
@@ -528,7 +536,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         </div>
       </div>
 
-      {/* SECTION 3: SOCIAL MEDIA & MUSIC LINKS (NEW) */}
+      {/* SECTION 3: SOCIAL MEDIA & MUSIC LINKS */}
       <div className="space-y-4">
         <div className="border-b border-[#383530]/60 pb-3">
           <div className="flex items-center gap-2">
@@ -623,7 +631,69 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         </form>
       </div>
 
-      {/* SECTION 4: ACCOUNT & PROFILE SETTINGS SKELETON */}
+      {/* SECTION 4: APP PREFERENCES & BORDERLESS NAVIGATION LAYOUT OPTION */}
+      {onToggleNavPosition && (
+        <div className="space-y-4">
+          <div className="border-b border-[#383530]/60 pb-3">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-[#CC6543]" />
+              <h2 className="text-lg font-bold text-[#F5F2EB] uppercase tracking-wider">
+                Navigation Layout
+              </h2>
+            </div>
+            <p className="text-xs text-[#A8A297] mt-0.5">
+              Choose your preferred taskbar navigation placement.
+            </p>
+          </div>
+
+          {/* Simple, Minimalistic Borderless Selection */}
+          <div className="bg-[#252320]/80 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-center sm:text-left">
+              <span className="text-sm font-bold text-[#F5F2EB] block">
+                Taskbar Position
+              </span>
+              <span className="text-xs text-[#A8A297] block">
+                Currently set to {navPosition === 'top' ? 'Top Header' : 'Side Rail'}
+              </span>
+            </div>
+
+            {/* Clean Borderless Segmented Switch */}
+            <div className="flex items-center gap-2 p-1 bg-transparent">
+              <button
+                type="button"
+                onClick={() => {
+                  if (navPosition !== 'top') onToggleNavPosition();
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition-all duration-200 ${
+                  navPosition === 'top'
+                    ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/20'
+                    : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/60'
+                }`}
+              >
+                <PanelTop className="w-4 h-4" />
+                <span>Top Header</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (navPosition !== 'side') onToggleNavPosition();
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition-all duration-200 ${
+                  navPosition === 'side'
+                    ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/20'
+                    : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/60'
+                }`}
+              >
+                <PanelLeft className="w-4 h-4" />
+                <span>Side Rail</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 5: ACCOUNT & PROFILE SETTINGS SKELETON */}
       <div className="space-y-4">
         <div className="border-b border-[#383530]/60 pb-3">
           <h2 className="text-lg font-bold text-[#F5F2EB] uppercase tracking-wider">
@@ -697,7 +767,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         </form>
       </div>
 
-      {/* SECTION 5: SECURITY & PASSWORD SKELETON */}
+      {/* SECTION 6: SECURITY & PASSWORD SKELETON */}
       <div className="space-y-4">
         <div className="border-b border-[#383530]/60 pb-3">
           <h2 className="text-lg font-bold text-[#F5F2EB] uppercase tracking-wider">
@@ -774,7 +844,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         </form>
       </div>
 
-      {/* SECTION 6: DATA EXPORT & BACKUP */}
+      {/* SECTION 7: DATA EXPORT & BACKUP */}
       <div className="space-y-4">
         <div className="border-b border-[#383530]/60 pb-3">
           <h2 className="text-lg font-bold text-[#F5F2EB] uppercase tracking-wider">

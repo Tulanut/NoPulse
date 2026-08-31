@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Header, ScreenState } from './components/Header';
+import { Header, ScreenState, NavPosition } from './components/Header';
 import { LandingScreen } from './components/LandingScreen';
 import { ExerciseHub } from './components/ExerciseHub';
 import { ExerciseDetailView } from './components/ExerciseDetailView';
@@ -32,6 +32,19 @@ export const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('landing');
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
 
+  // Nav Position: 'top' | 'side' (Stored locally)
+  const [navPosition, setNavPosition] = useState<NavPosition>(() => {
+    return (localStorage.getItem('nopulse_nav_position') as NavPosition) || 'top';
+  });
+
+  const toggleNavPosition = () => {
+    setNavPosition((prev) => {
+      const next = prev === 'top' ? 'side' : 'top';
+      localStorage.setItem('nopulse_nav_position', next);
+      return next;
+    });
+  };
+
   // Calculate unique exercise count (only from actual user logs)
   const uniqueExerciseCount = useMemo(() => {
     const set = new Set(allWorkouts.map((w) => w.exercise_name.trim().toLowerCase()));
@@ -56,7 +69,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#191816] text-[#F5F2EB] flex flex-col font-sans selection:bg-[#CC6543] selection:text-white">
-      {/* Top Header - Auto-hides, shown inside app sections */}
+      {/* Navigation Header / Sidebar - Auto-hides, shown inside app sections */}
       {currentScreen !== 'landing' && (
         <Header
           currentScreen={currentScreen}
@@ -66,6 +79,8 @@ export const App: React.FC = () => {
             }
             setCurrentScreen(screen);
           }}
+          navPosition={navPosition}
+          onToggleNavPosition={toggleNavPosition}
           isOnline={network.isOnline}
           simulatedOffline={network.simulatedOffline}
           toggleSimulateOffline={network.toggleSimulateOffline}
@@ -78,11 +93,13 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Main Screen Content with Dedicated Top Clearance */}
+      {/* Main Screen Content with Dynamic Top/Side Clearance */}
       <main
-        className={`flex-1 w-full max-w-5xl mx-auto px-4 ${
+        className={`flex-1 w-full max-w-5xl mx-auto px-4 transition-all duration-300 ${
           currentScreen === 'landing'
             ? 'flex flex-col justify-center py-6'
+            : navPosition === 'side'
+            ? 'sm:pl-28 pt-8 pb-16'
             : 'pt-20 sm:pt-24 pb-16'
         }`}
       >
@@ -153,6 +170,8 @@ export const App: React.FC = () => {
           {currentScreen === 'profile' && (
             <UserProfileView
               workouts={allWorkouts}
+              navPosition={navPosition}
+              onToggleNavPosition={toggleNavPosition}
               onBackToHome={handleGoHome}
             />
           )}
@@ -161,7 +180,11 @@ export const App: React.FC = () => {
 
       {/* Minimal Footer */}
       {currentScreen !== 'landing' && (
-        <footer className="border-t border-claude-border bg-[#191816] py-4 px-4 text-center text-xs text-claude-textDim animate-fade-in">
+        <footer
+          className={`border-t border-claude-border bg-[#191816] py-4 px-4 text-center text-xs text-claude-textDim animate-fade-in transition-all duration-300 ${
+            navPosition === 'side' ? 'sm:pl-28' : ''
+          }`}
+        >
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
             <span className="font-serif">
               NoPulse &copy; {new Date().getFullYear()} — Minimalist Gym Tracker

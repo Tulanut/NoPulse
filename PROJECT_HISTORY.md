@@ -84,6 +84,9 @@
   - **Social Media & Spotify Music Sharing**:
     - Share handles / links for Instagram, YouTube, TikTok, and Spotify Profile / Workout Playlists.
     - Clickable badges displayed on top profile card with direct external links.
+  - **Taskbar Navigation Layout Option (Top vs. Side)**:
+    - Minimalist borderless toggle allowing users to switch taskbar position between **Top Header** and **Side Rail**.
+    - Floating side rail with vertical navigation pills, responsive padding layout adjustments, and persistent local preference storage.
   - **Account & Security Settings Skeleton**:
     - Change Username & Email with immediate local preview persistence.
     - Change Profile Picture (file upload / custom photo base64 preview with remove option).
