@@ -54,9 +54,10 @@ export function useWorkouts() {
     return () => unsubscribe();
   }, [refreshLocalWorkouts]);
 
-  // Initial load
+  // Initial load & trigger sync immediately
   useEffect(() => {
     refreshLocalWorkouts();
+    syncService.runSync().then(() => refreshLocalWorkouts());
   }, [refreshLocalWorkouts]);
 
   // Trigger sync when transitioning to online
@@ -129,6 +130,40 @@ export function useWorkouts() {
     [customProfiles, workouts, network.isOnline, refreshLocalWorkouts]
   );
 
+  // Update profile for all entries of an exercise
+  const updateExerciseProfile = useCallback(
+    async (exerciseName: string, newProfile: string | null) => {
+      const trimmedProfile = newProfile ? newProfile.trim() : null;
+
+      // If new profile is provided and not in customProfiles, save it
+      if (trimmedProfile && !customProfiles.includes(trimmedProfile)) {
+        const next = [...customProfiles, trimmedProfile];
+        setCustomProfiles(next);
+        await localDB.saveCustomProfiles(next);
+      }
+
+      const matching = workouts.filter(
+        (w) => w.exercise_name.toLowerCase() === exerciseName.toLowerCase()
+      );
+
+      for (const w of matching) {
+        await localDB.saveWorkout({
+          ...w,
+          profile: trimmedProfile,
+          sync_status: 'pending',
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+    },
+    [customProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+  );
+
   // Add a new workout log
   const addWorkout = useCallback(
     async (data: {
@@ -142,6 +177,8 @@ export function useWorkouts() {
       notes?: string;
     }) => {
       const now = new Date().toISOString();
+      const trimmedProfile = data.profile ? data.profile.trim() : null;
+
       const newWorkout: Workout = {
         id: generateUUID(),
         exercise_name: data.exercise_name.trim(),
@@ -149,7 +186,7 @@ export function useWorkouts() {
         reps: data.reps,
         rir: data.rir,
         weight: data.weight ?? null,
-        profile: data.profile ? data.profile.trim() : null,
+        profile: trimmedProfile,
         date: data.date || now.split('T')[0],
         notes: data.notes?.trim() || null,
         created_at: now,
@@ -159,13 +196,13 @@ export function useWorkouts() {
       };
 
       // 1. If profile is new, also save to custom profiles
-      if (newWorkout.profile && !customProfiles.includes(newWorkout.profile)) {
-        const nextProfiles = [...customProfiles, newWorkout.profile];
+      if (trimmedProfile && !customProfiles.includes(trimmedProfile)) {
+        const nextProfiles = [...customProfiles, trimmedProfile];
         setCustomProfiles(nextProfiles);
         await localDB.saveCustomProfiles(nextProfiles);
       }
 
-      // 2. Save immediately to local IndexedDB (Zero latency, works offline)
+      // 2. Save immediately to local IndexedDB
       await localDB.saveWorkout(newWorkout);
       await refreshLocalWorkouts();
 
@@ -274,6 +311,7 @@ export function useWorkouts() {
     createProfile,
     deleteProfile,
     deleteExercise,
+    updateExerciseProfile,
     loading,
     syncState,
     lastSyncedAt,

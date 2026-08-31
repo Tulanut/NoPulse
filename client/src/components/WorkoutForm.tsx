@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Plus, Calendar, FolderPlus, X } from 'lucide-react';
+import { Check, Plus, Calendar, FolderPlus, X, Tag } from 'lucide-react';
 
 interface WorkoutFormProps {
   profiles?: string[];
@@ -75,7 +75,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Automatically resolve profile: if user typed a new profile, create and assign it directly
+      // 1. Auto-resolve profile: if user typed a new profile, create and assign it directly
       let effectiveProfile: string | null = selectedProfile;
       if (isCreatingProfile && newProfileName.trim()) {
         const trimmed = newProfileName.trim();
@@ -92,7 +92,7 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
       const loggedName = exerciseName.trim();
       const parsedWeight = weight.trim() !== '' ? parseFloat(weight) : null;
 
-      // Save directly with the chosen/created profile
+      // 2. Save directly into the chosen profile
       await onAddWorkout({
         exercise_name: loggedName,
         sets,
@@ -213,20 +213,17 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
           />
         </div>
 
-        {/* Field 3: Workout Profile Section (Pick or create on the fly) */}
+        {/* Field 3: Workout Profile Section */}
         <div className="space-y-3 border-b border-[#383530]/60 pb-7">
           <div className="flex items-center justify-between">
             <label className="block text-xs tracking-widest uppercase text-[#A8A297] font-medium">
               Save To Workout Profile
             </label>
             {selectedProfile && (
-              <button
-                type="button"
-                onClick={() => setSelectedProfile(null)}
-                className="text-[11px] text-[#706B62] hover:text-[#CC6543] transition underline"
-              >
-                Reset to None (General)
-              </button>
+              <span className="text-xs font-semibold text-[#CC6543] flex items-center gap-1">
+                <Tag className="w-3 h-3" />
+                Target: {selectedProfile}
+              </span>
             )}
           </div>
 
