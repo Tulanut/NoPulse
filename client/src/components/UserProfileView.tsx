@@ -147,6 +147,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       workoutCountsByDate.set(w.date, (workoutCountsByDate.get(w.date) || 0) + 1);
     });
 
+    // Custom day abbreviations: SN (Sun), M (Mon), T (Tue), W (Wed), TH (Thu), F (Fri), ST (Sat)
+    const DAY_SHORT_FORMS = ['SN', 'M', 'T', 'W', 'TH', 'F', 'ST'];
+
     const days = [];
     const today = new Date();
 
@@ -155,10 +158,11 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       d.setDate(today.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const count = workoutCountsByDate.get(dateStr) || 0;
+      const dayIndex = d.getDay(); // 0 is Sunday, 6 is Saturday
       days.push({
         date: dateStr,
         count,
-        dayOfWeek: d.toLocaleDateString('en-US', { weekday: 'narrow' }),
+        dayOfWeek: DAY_SHORT_FORMS[dayIndex],
       });
     }
 
