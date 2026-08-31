@@ -249,6 +249,19 @@ export const ExerciseDetailView: React.FC<ExerciseDetailViewProps> = ({
         </div>
       </div>
 
+      {/* Floating Minimalist Success Toast */}
+      {successMessage && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#1F1D1A]/95 border border-[#789D74]/50 text-[#F5F2EB] shadow-2xl shadow-black/90 backdrop-blur-xl animate-pop-in">
+          <div className="w-6 h-6 rounded-full bg-[#789D74]/20 text-[#789D74] flex items-center justify-center shrink-0">
+            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+          </div>
+          <div className="text-xs font-medium">
+            <span className="font-bold text-white">{exerciseName}</span> set logged successfully
+            {selectedProfile && <span className="text-[#CC6543] font-semibold"> · {selectedProfile}</span>}
+          </div>
+        </div>
+      )}
+
       {/* Success Banner */}
       {successMessage && (
         <div className="p-4 rounded-2xl bg-[#789D74]/15 border border-[#789D74]/30 text-[#B8D4B5] text-sm flex items-center gap-2.5 animate-pop-in">
