@@ -135,7 +135,6 @@ export function useWorkouts() {
     async (exerciseName: string, newProfile: string | null) => {
       const trimmedProfile = newProfile ? newProfile.trim() : null;
 
-      // If new profile is provided and not in customProfiles, save it
       if (trimmedProfile && !customProfiles.includes(trimmedProfile)) {
         const next = [...customProfiles, trimmedProfile];
         setCustomProfiles(next);
@@ -162,6 +161,57 @@ export function useWorkouts() {
       }
     },
     [customProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+  );
+
+  // Bulk update profile for multiple exercises
+  const bulkUpdateExerciseProfile = useCallback(
+    async (exerciseNames: string[], newProfile: string | null) => {
+      const trimmedProfile = newProfile ? newProfile.trim() : null;
+      const nameSet = new Set(exerciseNames.map((n) => n.toLowerCase()));
+
+      if (trimmedProfile && !customProfiles.includes(trimmedProfile)) {
+        const next = [...customProfiles, trimmedProfile];
+        setCustomProfiles(next);
+        await localDB.saveCustomProfiles(next);
+      }
+
+      const matching = workouts.filter((w) => nameSet.has(w.exercise_name.toLowerCase()));
+
+      for (const w of matching) {
+        await localDB.saveWorkout({
+          ...w,
+          profile: trimmedProfile,
+          sync_status: 'pending',
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+    },
+    [customProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+  );
+
+  // Bulk delete all entries for multiple exercises
+  const bulkDeleteExercises = useCallback(
+    async (exerciseNames: string[]) => {
+      const nameSet = new Set(exerciseNames.map((n) => n.toLowerCase()));
+      const toDelete = workouts.filter((w) => nameSet.has(w.exercise_name.toLowerCase()));
+
+      for (const w of toDelete) {
+        await localDB.deleteWorkout(w.id);
+      }
+
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+    },
+    [workouts, network.isOnline, refreshLocalWorkouts]
   );
 
   // Add a new workout log
@@ -229,7 +279,7 @@ export function useWorkouts() {
     [network.isOnline, refreshLocalWorkouts]
   );
 
-  // Delete all entries for an exercise (optionally scoped to a profile)
+  // Delete all entries for an exercise
   const deleteExercise = useCallback(
     async (exerciseName: string, profile?: string) => {
       const toDelete = workouts.filter((w) => {
@@ -312,6 +362,8 @@ export function useWorkouts() {
     deleteProfile,
     deleteExercise,
     updateExerciseProfile,
+    bulkUpdateExerciseProfile,
+    bulkDeleteExercises,
     loading,
     syncState,
     lastSyncedAt,

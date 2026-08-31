@@ -15,6 +15,8 @@ export const App: React.FC = () => {
     createProfile,
     deleteProfile,
     deleteExercise,
+    bulkUpdateExerciseProfile,
+    bulkDeleteExercises,
     syncState,
     lastSyncedAt,
     pendingSyncCount,
@@ -125,6 +127,8 @@ export const App: React.FC = () => {
               onCreateProfile={createProfile}
               onDeleteProfile={deleteProfile}
               onDeleteExercise={deleteExercise}
+              onBulkUpdateExerciseProfile={bulkUpdateExerciseProfile}
+              onBulkDeleteExercises={bulkDeleteExercises}
               onSelectExercise={handleSelectExercise}
               onGoToLog={() => setCurrentScreen('log')}
               onGoHome={handleGoHome}

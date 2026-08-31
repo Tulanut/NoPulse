@@ -1,5 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowRight, Plus, Search, Folder, ArrowLeft, Trash2 } from 'lucide-react';
+import {
+  ArrowRight,
+  Plus,
+  Search,
+  Folder,
+  ArrowLeft,
+  Trash2,
+  CheckSquare,
+  Square,
+  FolderPlus,
+  X,
+} from 'lucide-react';
 import { Workout } from '../types/workout';
 import { formatSpelledDate } from '../utils/dateUtils';
 
@@ -9,6 +20,8 @@ interface ExerciseHubProps {
   onCreateProfile: (name: string) => Promise<string>;
   onDeleteProfile?: (profileName: string) => Promise<void> | void;
   onDeleteExercise?: (exerciseName: string, profile?: string) => Promise<void> | void;
+  onBulkUpdateExerciseProfile?: (exerciseNames: string[], newProfile: string | null) => Promise<void> | void;
+  onBulkDeleteExercises?: (exerciseNames: string[]) => Promise<void> | void;
   onSelectExercise: (exerciseName: string) => void;
   onGoToLog: () => void;
   onGoHome: () => void;
@@ -29,8 +42,11 @@ interface ExerciseSummary {
 export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   workouts,
   profiles,
+  onCreateProfile,
   onDeleteProfile,
   onDeleteExercise,
+  onBulkUpdateExerciseProfile,
+  onBulkDeleteExercises,
   onSelectExercise,
   onGoToLog,
 }) => {
@@ -38,6 +54,14 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [deleteConfirmProfile, setDeleteConfirmProfile] = useState<string | null>(null);
   const [deleteConfirmExercise, setDeleteConfirmExercise] = useState<string | null>(null);
+
+  // Bulk Selection State
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectedExercises, setSelectedExercises] = useState<Set<string>>(new Set());
+  const [showProfilePicker, setShowProfilePicker] = useState(false);
+  const [isCreatingBulkProfile, setIsCreatingBulkProfile] = useState(false);
+  const [bulkNewProfileName, setBulkNewProfileName] = useState('');
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   // Group workouts by exercise name helper
   const groupExercises = (workoutList: Workout[]): ExerciseSummary[] => {
@@ -146,6 +170,63 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     );
   }, [currentSummaries, searchQuery]);
 
+  // Bulk selection helpers
+  const toggleSelectExercise = (name: string) => {
+    setSelectedExercises((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    const allNames = filteredSummaries.map((s) => s.name);
+    setSelectedExercises(new Set(allNames));
+  };
+
+  const deselectAll = () => {
+    setSelectedExercises(new Set());
+  };
+
+  const exitSelectionMode = () => {
+    setIsSelecting(false);
+    setSelectedExercises(new Set());
+    setShowProfilePicker(false);
+    setIsCreatingBulkProfile(false);
+    setConfirmBulkDelete(false);
+  };
+
+  // Bulk Actions
+  const handleBulkMoveToProfile = async (targetProfile: string | null) => {
+    if (selectedExercises.size === 0 || !onBulkUpdateExerciseProfile) return;
+    const names = Array.from(selectedExercises);
+    await onBulkUpdateExerciseProfile(names, targetProfile);
+    exitSelectionMode();
+  };
+
+  const handleBulkCreateProfileAndMove = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkNewProfileName.trim() || selectedExercises.size === 0 || !onBulkUpdateExerciseProfile) return;
+
+    const created = await onCreateProfile(bulkNewProfileName.trim());
+    const names = Array.from(selectedExercises);
+    await onBulkUpdateExerciseProfile(names, created);
+    setBulkNewProfileName('');
+    exitSelectionMode();
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedExercises.size === 0 || !onBulkDeleteExercises) return;
+    const names = Array.from(selectedExercises);
+    await onBulkDeleteExercises(names);
+    exitSelectionMode();
+  };
+
+  // Single item delete click handlers
   const handleDeleteProfileClick = (e: React.MouseEvent, profileName: string) => {
     e.stopPropagation();
     setDeleteConfirmProfile(profileName);
@@ -175,6 +256,270 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     setDeleteConfirmExercise(null);
   };
 
+  // Render Exercise Item Row
+  const renderExerciseRow = (item: ExerciseSummary) => {
+    const isChecked = selectedExercises.has(item.name);
+
+    return (
+      <div
+        key={item.name}
+        className={`py-5 flex items-center justify-between gap-4 transition-all duration-200 group rounded-xl px-2.5 -mx-2.5 ${
+          isSelecting
+            ? isChecked
+              ? 'bg-[#CC6543]/10 border border-[#CC6543]/40'
+              : 'hover:bg-[#252320]/60 border border-transparent'
+            : 'hover:translate-x-1'
+        }`}
+      >
+        {/* If in selection mode, show checkbox */}
+        {isSelecting && (
+          <button
+            type="button"
+            onClick={() => toggleSelectExercise(item.name)}
+            className="p-1 text-[#CC6543] hover:scale-110 active:scale-95 transition shrink-0"
+          >
+            {isChecked ? (
+              <CheckSquare className="w-5 h-5 fill-[#CC6543] text-[#191816]" />
+            ) : (
+              <Square className="w-5 h-5 text-[#706B62]" />
+            )}
+          </button>
+        )}
+
+        <button
+          onClick={() => {
+            if (isSelecting) {
+              toggleSelectExercise(item.name);
+            } else {
+              onSelectExercise(item.name);
+            }
+          }}
+          className="space-y-1.5 flex-1 text-left"
+        >
+          <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F2EB] group-hover:text-claude-terracottaLight transition-colors">
+            {item.name}
+          </h3>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#A8A297]">
+            <span>
+              {item.totalLogs} {item.totalLogs === 1 ? 'session' : 'sessions'}
+            </span>
+            <span className="text-[#4D4740]">·</span>
+            <span>{item.totalSets} sets</span>
+            <span className="text-[#4D4740]">·</span>
+            <span>{item.totalReps} reps</span>
+            {item.maxWeight > 0 && (
+              <>
+                <span className="text-[#4D4740]">·</span>
+                <span className="text-[#DE7C5A] font-bold">{item.maxWeight} kg</span>
+              </>
+            )}
+            {item.lastTrainedDate && (
+              <>
+                <span className="text-[#4D4740]">·</span>
+                <span className="text-[#8A8477]">
+                  {formatSpelledDate(item.lastTrainedDate)}
+                </span>
+              </>
+            )}
+          </div>
+        </button>
+
+        {/* Normal Actions (hidden during selection) */}
+        {!isSelecting && (
+          <div className="flex items-center gap-2 shrink-0">
+            {onDeleteExercise && (
+              deleteConfirmExercise === item.name ? (
+                <div className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2.5 py-1 rounded-full animate-pop-in">
+                  <span className="text-[10px] text-[#F5B5B5]">Delete?</span>
+                  <button
+                    onClick={(e) => handleConfirmDeleteExercise(e, item.name)}
+                    className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirmExercise(null);
+                    }}
+                    className="text-[10px] text-[#A8A297] hover:text-white"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={(e) => handleDeleteExerciseClick(e, item.name)}
+                  className="p-2 rounded-full text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors opacity-70 group-hover:opacity-100"
+                  title={`Delete ${item.name}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )
+            )}
+
+            <button
+              onClick={() => onSelectExercise(item.name)}
+              className="w-10 h-10 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all duration-200"
+            >
+              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // -------------------------------------------------------------
+  // FLOATING BULK ACTIONS BAR (When exercises are selected)
+  // -------------------------------------------------------------
+  const renderBulkActionBar = () => {
+    if (!isSelecting || selectedExercises.size === 0) return null;
+
+    return (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl px-4 animate-slide-up">
+        <div className="bg-[#1E1D1A]/95 border border-[#CC6543]/60 rounded-2xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-3 text-sm">
+          <div className="flex items-center justify-between pb-2 border-b border-[#383530]">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-md bg-[#CC6543] text-white font-bold text-xs">
+                {selectedExercises.size}
+              </span>
+              <span className="font-bold text-[#F5F2EB]">
+                {selectedExercises.size === 1 ? 'Exercise Selected' : 'Exercises Selected'}
+              </span>
+            </div>
+
+            <button
+              onClick={exitSelectionMode}
+              className="text-xs text-[#A8A297] hover:text-white flex items-center gap-1"
+            >
+              <X className="w-4 h-4" />
+              <span>Cancel</span>
+            </button>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 1. Add / Move to Profile */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowProfilePicker(!showProfilePicker)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#252320] border border-[#383530] hover:border-[#CC6543] text-xs font-semibold text-[#F5F2EB] hover:text-white transition"
+              >
+                <FolderPlus className="w-3.5 h-3.5 text-[#CC6543]" />
+                <span>Move to Profile</span>
+              </button>
+
+              {/* Profile Picker Dropdown / Popover */}
+              {showProfilePicker && (
+                <div className="absolute bottom-full left-0 mb-2 w-64 bg-[#252320] border border-[#383530] rounded-xl shadow-2xl p-3 space-y-2 z-50 animate-pop-in">
+                  <span className="text-[10px] uppercase font-bold text-[#A8A297] tracking-wider block pb-1 border-b border-[#383530]">
+                    Select Target Profile
+                  </span>
+
+                  {/* Remove from Profile (Make General) */}
+                  <button
+                    type="button"
+                    onClick={() => handleBulkMoveToProfile(null)}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#383530] text-xs text-[#F5F2EB] transition flex items-center justify-between"
+                  >
+                    <span>None (General Exercises)</span>
+                  </button>
+
+                  {/* Existing Profiles */}
+                  {profiles.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => handleBulkMoveToProfile(p)}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#CC6543]/20 hover:text-white text-xs text-[#F5F2EB] transition flex items-center justify-between"
+                    >
+                      <span>{p}</span>
+                    </button>
+                  ))}
+
+                  {/* Create New Profile Inline */}
+                  <div className="pt-2 border-t border-[#383530]">
+                    {!isCreatingBulkProfile ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingBulkProfile(true)}
+                        className="w-full text-left px-2 py-1 text-xs text-[#CC6543] hover:underline flex items-center gap-1 font-semibold"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Create New Profile...</span>
+                      </button>
+                    ) : (
+                      <form onSubmit={handleBulkCreateProfileAndMove} className="space-y-2">
+                        <input
+                          type="text"
+                          placeholder="New profile name..."
+                          value={bulkNewProfileName}
+                          onChange={(e) => setBulkNewProfileName(e.target.value)}
+                          autoFocus
+                          className="w-full bg-[#191816] border border-[#CC6543] rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none"
+                        />
+                        <div className="flex gap-1.5">
+                          <button
+                            type="submit"
+                            className="flex-1 bg-[#CC6543] hover:bg-[#DE7C5A] text-white py-1 rounded text-[11px] font-bold"
+                          >
+                            Create & Move
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsCreatingBulkProfile(false)}
+                            className="px-2 py-1 text-[11px] text-[#A8A297]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Delete All Selected */}
+            <div className="relative">
+              {!confirmBulkDelete ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmBulkDelete(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#D45B5B]/15 border border-[#D45B5B]/30 hover:bg-[#D45B5B]/25 text-xs font-semibold text-[#F5B5B5] transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-[#D45B5B]" />
+                  <span>Delete Selected</span>
+                </button>
+              ) : (
+                <div className="inline-flex items-center gap-2 bg-[#D45B5B]/20 border border-[#D45B5B] px-3 py-1 rounded-xl animate-pop-in">
+                  <span className="text-xs text-[#F5B5B5] font-bold">Delete {selectedExercises.size} exercises?</span>
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    className="text-xs bg-[#D45B5B] hover:bg-red-600 text-white font-bold px-2 py-0.5 rounded uppercase"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmBulkDelete(false)}
+                    className="text-xs text-[#A8A297] hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // -------------------------------------------------------------
   // VIEW 1: DRILLDOWN INTO A SPECIFIC WORKOUT PROFILE
   // -------------------------------------------------------------
@@ -183,7 +528,10 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
       <div className="min-h-[85vh] flex flex-col justify-center max-w-3xl mx-auto px-4 py-8 select-none animate-slide-up font-sans">
         {/* Back Button */}
         <button
-          onClick={() => setActiveProfile(null)}
+          onClick={() => {
+            exitSelectionMode();
+            setActiveProfile(null);
+          }}
           className="group inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[#A8A297] hover:text-[#F5F2EB] active:scale-95 transition-all mb-4 font-medium"
         >
           <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" />
@@ -191,7 +539,7 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         </button>
 
         {/* Profile Header */}
-        <div className="mb-10 pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
+        <div className="mb-8 pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-[#CC6543]/15 text-[#CC6543] flex items-center justify-center">
@@ -243,20 +591,63 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
             </p>
           </div>
 
-          {/* Search inside profile */}
-          {currentSummaries.length > 0 && (
-            <div className="relative w-full sm:w-56">
-              <Search className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-[#706B62]" />
-              <input
-                type="text"
-                placeholder={`Search in ${activeProfile}...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border-b border-[#383530] focus:border-[#CC6543] pl-6 pr-2 py-1.5 text-sm text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
-              />
-            </div>
-          )}
+          {/* Search & Bulk Select Trigger */}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {currentSummaries.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isSelecting) exitSelectionMode();
+                  else setIsSelecting(true);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  isSelecting
+                    ? 'bg-[#CC6543] text-white shadow-sm'
+                    : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white'
+                }`}
+              >
+                {isSelecting ? 'Done' : 'Select'}
+              </button>
+            )}
+
+            {currentSummaries.length > 0 && (
+              <div className="relative flex-1 sm:w-56">
+                <Search className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-[#706B62]" />
+                <input
+                  type="text"
+                  placeholder={`Search in ${activeProfile}...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent border-b border-[#383530] focus:border-[#CC6543] pl-6 pr-2 py-1.5 text-sm text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
+                />
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Selection Bar inside Profile */}
+        {isSelecting && filteredSummaries.length > 0 && (
+          <div className="mb-4 flex items-center justify-between text-xs text-[#A8A297] bg-[#252320]/60 p-2.5 rounded-xl border border-[#383530]">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={selectAll}
+                className="hover:text-white underline"
+              >
+                Select All ({filteredSummaries.length})
+              </button>
+              <span>·</span>
+              <button
+                onClick={deselectAll}
+                className="hover:text-white underline"
+              >
+                Deselect All
+              </button>
+            </div>
+            <span className="text-[#CC6543] font-bold">
+              {selectedExercises.size} selected
+            </span>
+          </div>
+        )}
 
         {/* Exercises List inside Profile */}
         {filteredSummaries.length === 0 ? (
@@ -274,99 +665,22 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
           </div>
         ) : (
           <div className="divide-y divide-[#2E2B26]">
-            {filteredSummaries.map((item) => (
-              <div
-                key={item.name}
-                className="py-6 flex items-center justify-between gap-4 hover:translate-x-1 transition-all duration-200 group"
-              >
-                <button
-                  onClick={() => onSelectExercise(item.name)}
-                  className="space-y-1.5 flex-1 text-left"
-                >
-                  <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F2EB] group-hover:text-claude-terracottaLight transition-colors">
-                    {item.name}
-                  </h3>
-
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#A8A297]">
-                    <span>
-                      {item.totalLogs} {item.totalLogs === 1 ? 'session' : 'sessions'}
-                    </span>
-                    <span className="text-[#4D4740]">·</span>
-                    <span>{item.totalSets} sets</span>
-                    <span className="text-[#4D4740]">·</span>
-                    <span>{item.totalReps} reps</span>
-                    {item.maxWeight > 0 && (
-                      <>
-                        <span className="text-[#4D4740]">·</span>
-                        <span className="text-[#DE7C5A] font-bold">{item.maxWeight} kg</span>
-                      </>
-                    )}
-                    {item.lastTrainedDate && (
-                      <>
-                        <span className="text-[#4D4740]">·</span>
-                        <span className="text-[#8A8477]">
-                          {formatSpelledDate(item.lastTrainedDate)}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </button>
-
-                {/* Actions: Delete Exercise & View Arrow */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {onDeleteExercise && (
-                    deleteConfirmExercise === item.name ? (
-                      <div className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2.5 py-1 rounded-full animate-pop-in">
-                        <span className="text-[10px] text-[#F5B5B5]">Delete?</span>
-                        <button
-                          onClick={(e) => handleConfirmDeleteExercise(e, item.name)}
-                          className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
-                        >
-                          Yes
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirmExercise(null);
-                          }}
-                          className="text-[10px] text-[#A8A297] hover:text-white"
-                        >
-                          No
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={(e) => handleDeleteExerciseClick(e, item.name)}
-                        className="p-2 rounded-full text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors"
-                        title={`Delete ${item.name}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )
-                  )}
-
-                  <button
-                    onClick={() => onSelectExercise(item.name)}
-                    className="w-10 h-10 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all duration-200"
-                  >
-                    <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+            {filteredSummaries.map(renderExerciseRow)}
           </div>
         )}
+
+        {/* Bulk Action Bar */}
+        {renderBulkActionBar()}
       </div>
     );
   }
 
   // -------------------------------------------------------------
   // VIEW 2: GENERAL EXERCISES HUB
-  // (Shows Profile Boxes with delete option + General exercises list with delete option)
   // -------------------------------------------------------------
   return (
     <div className="min-h-[85vh] flex flex-col justify-center max-w-3xl mx-auto px-4 py-8 select-none animate-slide-up font-sans space-y-10">
-      {/* Header & Search */}
+      {/* Header & Search & Select Button */}
       <div className="pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
         <div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[#F5F2EB] leading-tight">
@@ -379,23 +693,42 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
           </p>
         </div>
 
-        {/* Search Line */}
-        {workouts.length > 0 && (
-          <div className="relative w-full sm:w-56">
-            <Search className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-[#706B62]" />
-            <input
-              type="text"
-              placeholder="Search exercise..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent border-b border-[#383530] focus:border-[#CC6543] pl-6 pr-2 py-1.5 text-sm text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
-            />
-          </div>
-        )}
+        {/* Controls: Search & Select */}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {currentSummaries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (isSelecting) exitSelectionMode();
+                else setIsSelecting(true);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                isSelecting
+                  ? 'bg-[#CC6543] text-white shadow-sm'
+                  : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white'
+              }`}
+            >
+              {isSelecting ? 'Done' : 'Select'}
+            </button>
+          )}
+
+          {workouts.length > 0 && (
+            <div className="relative flex-1 sm:w-56">
+              <Search className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-[#706B62]" />
+              <input
+                type="text"
+                placeholder="Search exercise..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent border-b border-[#383530] focus:border-[#CC6543] pl-6 pr-2 py-1.5 text-sm text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* SECTION 1: WORKOUT PROFILE BOXES (With clear Delete Profile option) */}
-      {profileCards.length > 0 && (
+      {/* SECTION 1: WORKOUT PROFILE BOXES */}
+      {profileCards.length > 0 && !isSelecting && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-xs uppercase tracking-widest text-[#A8A297] font-semibold">
@@ -410,6 +743,7 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
                 onClick={() => {
                   setActiveProfile(p.name);
                   setSearchQuery('');
+                  exitSelectionMode();
                 }}
                 className="group relative text-left p-5 rounded-2xl bg-[#252320]/80 border border-[#383530] hover:border-[#CC6543] hover:bg-[#252320] transition-all flex items-center justify-between gap-4 cursor-pointer active:scale-[0.99]"
               >
@@ -473,12 +807,38 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         </div>
       )}
 
-      {/* SECTION 2: GENERAL EXERCISES LIST (With clear Delete Exercise option) */}
+      {/* SECTION 2: GENERAL EXERCISES LIST */}
       <div className="space-y-4 pt-2">
-        {profileCards.length > 0 && currentSummaries.length > 0 && (
-          <span className="text-xs uppercase tracking-widest text-[#A8A297] font-semibold block">
-            General Exercises
-          </span>
+        <div className="flex items-center justify-between">
+          {profileCards.length > 0 && currentSummaries.length > 0 && (
+            <span className="text-xs uppercase tracking-widest text-[#A8A297] font-semibold">
+              General Exercises
+            </span>
+          )}
+        </div>
+
+        {/* Selection Helper Controls */}
+        {isSelecting && filteredSummaries.length > 0 && (
+          <div className="flex items-center justify-between text-xs text-[#A8A297] bg-[#252320]/60 p-2.5 rounded-xl border border-[#383530]">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={selectAll}
+                className="hover:text-white underline"
+              >
+                Select All ({filteredSummaries.length})
+              </button>
+              <span>·</span>
+              <button
+                onClick={deselectAll}
+                className="hover:text-white underline"
+              >
+                Deselect All
+              </button>
+            </div>
+            <span className="text-[#CC6543] font-bold">
+              {selectedExercises.size} selected
+            </span>
+          </div>
         )}
 
         {/* Empty State */}
@@ -498,91 +858,14 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         ) : filteredSummaries.length === 0 ? (
           <p className="text-xs text-[#706B62] py-4">No standalone exercises found.</p>
         ) : (
-          /* Minimalist Editorial Exercise List with d Month yyyy Spelled Date and Delete */
           <div className="divide-y divide-[#2E2B26]">
-            {filteredSummaries.map((item) => (
-              <div
-                key={item.name}
-                className="py-6 flex items-center justify-between gap-4 hover:translate-x-1 transition-all duration-200 group"
-              >
-                <button
-                  onClick={() => onSelectExercise(item.name)}
-                  className="space-y-1.5 flex-1 text-left"
-                >
-                  <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F2EB] group-hover:text-claude-terracottaLight transition-colors">
-                    {item.name}
-                  </h3>
-
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#A8A297]">
-                    <span>
-                      {item.totalLogs} {item.totalLogs === 1 ? 'session' : 'sessions'}
-                    </span>
-                    <span className="text-[#4D4740]">·</span>
-                    <span>{item.totalSets} sets</span>
-                    <span className="text-[#4D4740]">·</span>
-                    <span>{item.totalReps} reps</span>
-                    {item.maxWeight > 0 && (
-                      <>
-                        <span className="text-[#4D4740]">·</span>
-                        <span className="text-[#DE7C5A] font-bold">{item.maxWeight} kg</span>
-                      </>
-                    )}
-                    {item.lastTrainedDate && (
-                      <>
-                        <span className="text-[#4D4740]">·</span>
-                        <span className="text-[#8A8477]">
-                          {formatSpelledDate(item.lastTrainedDate)}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </button>
-
-                {/* Actions: Delete Exercise + Arrow */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {onDeleteExercise && (
-                    deleteConfirmExercise === item.name ? (
-                      <div className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2.5 py-1 rounded-full animate-pop-in">
-                        <span className="text-[10px] text-[#F5B5B5]">Delete?</span>
-                        <button
-                          onClick={(e) => handleConfirmDeleteExercise(e, item.name)}
-                          className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
-                        >
-                          Yes
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirmExercise(null);
-                          }}
-                          className="text-[10px] text-[#A8A297] hover:text-white"
-                        >
-                          No
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={(e) => handleDeleteExerciseClick(e, item.name)}
-                        className="p-2 rounded-full text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors opacity-70 group-hover:opacity-100"
-                        title={`Delete ${item.name}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )
-                  )}
-
-                  <button
-                    onClick={() => onSelectExercise(item.name)}
-                    className="w-10 h-10 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all duration-200"
-                  >
-                    <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+            {filteredSummaries.map(renderExerciseRow)}
           </div>
         )}
       </div>
+
+      {/* Bulk Action Bar */}
+      {renderBulkActionBar()}
     </div>
   );
 };
