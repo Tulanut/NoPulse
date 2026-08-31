@@ -92,6 +92,8 @@
     - Change Profile Picture (file upload / custom photo base64 preview with remove option).
     - Change Password (current, new, confirm inputs with client-side validation).
     - One-click JSON data backup export.
+  - **Automated GitHub Pages Deployment**:
+    - Configured `.github/workflows/deploy.yml` to automatically build and host the live frontend app on GitHub Pages.
   - Designed with clean types (`client/src/types/user.ts`) for zero-friction mapping to future REST endpoints (`/api/user/profile`, `/api/user/password`) and SQLite user authentication tables.
 
 ---
