@@ -360,64 +360,87 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     });
   };
 
-  // Summaries for current view
-  const currentSummaries = useMemo(() => {
-    if (activeProfile) {
-      return sortWithCustomOrder(groupExercises(activeProfileWorkouts));
-    }
-    // On the main page, show direct/uncategorized exercises (or all if no profiles exist)
-    const list = profileCards.length > 0 ? uncategorizedWorkouts : workouts;
-    return sortWithCustomOrder(groupExercises(list));
-  }, [activeProfile, activeProfileWorkouts, profileCards.length, uncategorizedWorkouts, workouts, customOrder]);
-
   // Sub-profiles list for the currently active profile
   const currentSubProfiles = useMemo(() => {
     if (!activeProfile || !subProfiles) return [];
     return subProfiles[activeProfile] || [];
   }, [activeProfile, subProfiles]);
 
-  // Exercise counts per sub-profile inside the active profile
-  const subProfileCounts = useMemo(() => {
-    if (!activeProfile) return { all: 0, general: 0 };
-    const counts: Record<string, number> = {
-      all: currentSummaries.length,
-      general: 0,
-    };
+  // Sub-profile cards for the currently active profile (matching profileCards on the main page)
+  const subProfileCards = useMemo(() => {
+    if (!activeProfile) return [];
+    const subMap = new Map<string, { count: number; exerciseSet: Set<string> }>();
+
+    // 1. Register all known sub-profiles for this profile
     currentSubProfiles.forEach((s) => {
-      counts[s] = 0;
-    });
-
-    currentSummaries.forEach((ex) => {
-      if (ex.subProfile && counts[ex.subProfile] !== undefined) {
-        counts[ex.subProfile]++;
-      } else {
-        counts.general++;
+      if (!subMap.has(s)) {
+        subMap.set(s, { count: 0, exerciseSet: new Set() });
       }
     });
 
-    return counts;
-  }, [activeProfile, currentSubProfiles, currentSummaries]);
+    // 2. Count workouts and unique exercises per sub-profile in activeProfile
+    activeProfileWorkouts.forEach((w) => {
+      if (w.sub_profile) {
+        if (!subMap.has(w.sub_profile)) {
+          subMap.set(w.sub_profile, { count: 0, exerciseSet: new Set() });
+        }
+        const data = subMap.get(w.sub_profile)!;
+        data.count++;
+        data.exerciseSet.add(w.exercise_name.trim().toLowerCase());
+      }
+    });
 
-  // Filtered summaries with search and active sub-profile filtering
-  const filteredSummaries = useMemo(() => {
-    let list = currentSummaries;
+    return Array.from(subMap.entries()).map(([name, data]) => ({
+      name,
+      totalLogs: data.count,
+      uniqueExercises: data.exerciseSet.size,
+    }));
+  }, [activeProfile, currentSubProfiles, activeProfileWorkouts]);
 
-    // Filter by activeSubProfile if inside activeProfile
-    if (activeProfile && activeSubProfile) {
-      if (activeSubProfile === '__general__') {
-        list = list.filter((e) => !e.subProfile);
-      } else {
-        list = list.filter(
-          (e) => e.subProfile?.toLowerCase() === activeSubProfile.toLowerCase()
+  // Summaries for current view
+  const currentSummaries = useMemo(() => {
+    if (activeProfile) {
+      if (activeSubProfile) {
+        // Specific sub-profile drilled down
+        const list = activeProfileWorkouts.filter(
+          (w) => w.sub_profile?.toLowerCase() === activeSubProfile.toLowerCase()
         );
+        return sortWithCustomOrder(groupExercises(list));
       }
+      // In profile root: if sub-folders exist, show general (unassigned to sub-profile) exercises
+      const list = subProfileCards.length > 0
+        ? activeProfileWorkouts.filter((w) => !w.sub_profile)
+        : activeProfileWorkouts;
+      return sortWithCustomOrder(groupExercises(list));
     }
+    // On the main page, show direct/uncategorized exercises (or all if no profiles exist)
+    const list = profileCards.length > 0 ? uncategorizedWorkouts : workouts;
+    return sortWithCustomOrder(groupExercises(list));
+  }, [
+    activeProfile,
+    activeSubProfile,
+    activeProfileWorkouts,
+    subProfileCards.length,
+    profileCards.length,
+    uncategorizedWorkouts,
+    workouts,
+    customOrder,
+  ]);
 
-    if (!searchQuery.trim()) return list;
-    return list.filter((e) =>
-      e.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [currentSummaries, activeProfile, activeSubProfile, searchQuery]);
+  // Filtered summaries with search
+  const filteredSummaries = useMemo(() => {
+    if (searchQuery.trim()) {
+      // If user is searching at profile root, search across ALL exercises in this profile
+      const baseList =
+        activeProfile && !activeSubProfile
+          ? sortWithCustomOrder(groupExercises(activeProfileWorkouts))
+          : currentSummaries;
+      return baseList.filter((e) =>
+        e.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    return currentSummaries;
+  }, [currentSummaries, searchQuery, activeProfile, activeSubProfile, activeProfileWorkouts]);
 
   // Reorder exercises by drag & drop
   const reorderExercises = (sourceName: string, targetName: string, position: 'above' | 'below') => {
@@ -551,7 +574,6 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     await onCreateSubProfile(activeProfile, name);
     setNewSubProfileName('');
     setIsCreatingSubProfile(false);
-    setActiveSubProfile(name);
   };
 
   // Sub-profile rename handlers
@@ -1140,283 +1162,17 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   // VIEW 1: DRILLDOWN INTO A SPECIFIC WORKOUT PROFILE
   // -------------------------------------------------------------
   if (activeProfile) {
-    return (
-      <div className="min-h-[85vh] flex flex-col justify-center max-w-3xl mx-auto px-4 py-8 select-none animate-slide-up font-sans">
-        {/* Back Button / Drop target to remove from this profile */}
-        <button
-          onClick={() => {
-            exitSelectionMode();
-            setActiveProfile(null);
-          }}
-          data-profile-drop="__none__"
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            if (dragOverProfile !== '__none__') setDragOverProfile('__none__');
-          }}
-          onDragLeave={(e) => {
-            if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-            if (dragOverProfile === '__none__') setDragOverProfile(null);
-          }}
-          onDrop={async (e) => {
-            e.preventDefault();
-            const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
-            if (exerciseName && onBulkUpdateExerciseProfile) {
-              await onBulkUpdateExerciseProfile([exerciseName], null);
-              setDragFeedbackMessage(`Moved "${exerciseName}" out of "${activeProfile}" to General`);
-              setTimeout(() => setDragFeedbackMessage(null), 3000);
-            }
-            setDraggingExercise(null);
-            setDragOverProfile(null);
-          }}
-          className={`group inline-flex items-center gap-2 text-xs uppercase tracking-widest transition-all mb-4 font-medium px-3 py-1.5 rounded-xl ${
-            dragOverProfile === '__none__'
-              ? 'bg-[#CC6543] text-white scale-105 shadow-lg'
-              : draggingExercise
-              ? 'bg-[#CC6543]/15 text-[#CC6543] border border-dashed border-[#CC6543]'
-              : 'text-[#A8A297] hover:text-[#F5F2EB] active:scale-95'
-          }`}
-        >
-          <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" />
-          <span>
-            {draggingExercise ? '📥 Drop here to move back to General' : 'Back to Exercises'}
-          </span>
-        </button>
-
-        {/* Profile Header */}
-        <div className="mb-8 pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#CC6543]/15 text-[#CC6543] flex items-center justify-center shrink-0">
-                <Folder className="w-5 h-5" />
-              </div>
-
-              {editingProfile === activeProfile ? (
-                <form
-                  onSubmit={(e) => handleSaveRename(e, activeProfile)}
-                  className="flex items-center gap-2 flex-wrap animate-pop-in flex-1"
-                >
-                  <input
-                    type="text"
-                    value={editProfileName}
-                    onChange={(e) => setEditProfileName(e.target.value)}
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') handleCancelRename();
-                    }}
-                    className="bg-[#191816] border border-[#CC6543] rounded-xl px-3 py-1.5 text-2xl sm:text-4xl font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#CC6543] max-w-sm w-full"
-                    placeholder="Profile name..."
-                  />
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="submit"
-                      className="p-2 rounded-xl bg-[#CC6543] hover:bg-[#DE7C5A] text-white transition active:scale-95 shadow-md shadow-[#CC6543]/25"
-                      title="Save profile name"
-                    >
-                      <Check className="w-4 h-4 stroke-[3]" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleCancelRename()}
-                      className="p-2 rounded-xl bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white transition active:scale-95"
-                      title="Cancel"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="flex items-center gap-2.5 group/title flex-wrap">
-                  <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-[#F5F2EB]">
-                    {activeProfile}
-                  </h1>
-
-                  {/* Profile Rename Button */}
-                  {onRenameProfile && (
-                    <button
-                      onClick={(e) => handleStartRename(e, activeProfile)}
-                      className="p-1.5 rounded-lg text-[#706B62] hover:text-[#CC6543] hover:bg-[#2E2B27] transition-all opacity-80 group-hover/title:opacity-100"
-                      title={`Rename "${activeProfile}" profile`}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  )}
-
-                  {/* Profile Delete in Drilldown Header */}
-                  {onDeleteProfile && (
-                    deleteConfirmProfile === activeProfile ? (
-                      <div className="flex items-center gap-2 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-3 py-1 rounded-full animate-pop-in ml-1">
-                        <span className="text-[11px] text-[#F5B5B5] font-semibold">Delete Profile?</span>
-                        <button
-                          onClick={(e) => handleConfirmDeleteProfile(e, activeProfile)}
-                          className="text-[11px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
-                        >
-                          Yes
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirmProfile(null);
-                          }}
-                          className="text-[11px] text-[#A8A297] hover:text-white"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={(e) => handleDeleteProfileClick(e, activeProfile)}
-                        className="p-1.5 rounded-lg text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors ml-1"
-                        title={`Delete "${activeProfile}" profile`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )
-                  )}
-                </div>
-              )}
-            </div>
-
-            <p className="text-xs text-[#A8A297] mt-2">
-              {filteredSummaries.length === 0
-                ? 'No exercises recorded in this profile'
-                : `${filteredSummaries.length} ${
-                    filteredSummaries.length === 1 ? 'exercise' : 'exercises'
-                  } in ${activeProfile}`}
-            </p>
-          </div>
-
-          {/* Search & Bulk Select Trigger */}
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            {currentSummaries.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (isSelecting) exitSelectionMode();
-                  else setIsSelecting(true);
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                  isSelecting
-                    ? 'bg-[#CC6543] text-white shadow-sm'
-                    : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white'
-                }`}
-              >
-                {isSelecting ? 'Done' : 'Select'}
-              </button>
-            )}
-
-            {currentSummaries.length > 0 && (
-              <div className="relative flex-1 sm:w-56">
-                <Search className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-[#706B62]" />
-                <input
-                  type="text"
-                  placeholder={`Search in ${activeProfile}...`}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent border-b border-[#383530] focus:border-[#CC6543] pl-6 pr-2 py-1.5 text-sm text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* =========================================================================
-            SUB-FOLDERS / SECTIONS GROUPING SYSTEM (Within this Workout Profile)
-           ========================================================================= */}
-        <div className="mb-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] uppercase tracking-wider text-[#A8A297] font-bold">
-                Sub-Folders & Sections
-              </span>
-              {currentSubProfiles.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-[#252320] border border-[#383530] text-[10px] font-semibold text-[#CC6543]">
-                  {currentSubProfiles.length}
-                </span>
-              )}
-            </div>
-
-            {/* Quick Button to Create New Sub-Folder */}
-            {!isCreatingSubProfile && onCreateSubProfile && (
-              <button
-                type="button"
-                onClick={() => setIsCreatingSubProfile(true)}
-                className="inline-flex items-center gap-1 text-xs text-[#CC6543] hover:text-[#DE7C5A] font-semibold hover:underline"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Sub-Folder</span>
-              </button>
-            )}
-          </div>
-
-          {/* Inline Create Form if isCreatingSubProfile */}
-          {isCreatingSubProfile && (
-            <form
-              onSubmit={handleCreateSubProfile}
-              className="p-3 bg-[#252320]/80 border border-[#CC6543]/60 rounded-2xl flex items-center gap-2 animate-pop-in shadow-lg"
-            >
-              <Folder className="w-4 h-4 text-[#CC6543] shrink-0" />
-              <input
-                type="text"
-                placeholder="e.g. Not Enough Sleep Day, Enough Sleep Day, Heavy Day..."
-                value={newSubProfileName}
-                onChange={(e) => setNewSubProfileName(e.target.value)}
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setIsCreatingSubProfile(false);
-                    setNewSubProfileName('');
-                  }
-                }}
-                className="bg-transparent border-none focus:outline-none text-sm text-[#F5F2EB] placeholder-[#706B62] flex-1"
-              />
-              <button
-                type="submit"
-                disabled={!newSubProfileName.trim()}
-                className="px-3 py-1 rounded-xl bg-[#CC6543] hover:bg-[#DE7C5A] disabled:opacity-40 text-white text-xs font-bold transition flex items-center gap-1"
-              >
-                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                <span>Create</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCreatingSubProfile(false);
-                  setNewSubProfileName('');
-                }}
-                className="p-1 text-[#A8A297] hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </form>
-          )}
-
-          {/* Active Drag Instructions Banner inside Profile */}
-          {draggingExercise && (
-            <div className="p-3.5 rounded-xl bg-[#CC6543]/15 border border-[#CC6543]/40 text-[#DE7C5A] flex items-center justify-between text-xs animate-slide-up shadow-lg">
-              <div className="flex items-center gap-2 font-medium">
-                <FolderPlus className="w-4 h-4 text-[#CC6543] animate-bounce shrink-0" />
-                <span>
-                  Drop <strong>"{draggingExercise}"</strong> onto any sub-folder chip below, or into General.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setDraggingExercise(null);
-                  setDragOverSubProfile(null);
-                  setTouchPosition(null);
-                }}
-                className="text-xs text-[#A8A297] hover:text-white underline ml-2 shrink-0"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {/* Drop Target to remove from Sub-Folder (Make General inside this Profile) */}
-          {draggingExercise && (
-            <div
+    // SUB-VIEW 1B: SUB-FOLDER DRILLDOWN (Inside activeProfile -> activeSubProfile)
+    if (activeSubProfile) {
+      return (
+        <div className="min-h-[85vh] flex flex-col justify-center max-w-3xl mx-auto px-4 py-8 select-none animate-slide-up font-sans space-y-10">
+          {/* Back Button / Drop target to remove from this sub-folder */}
+          <div>
+            <button
+              onClick={() => {
+                exitSelectionMode();
+                setActiveSubProfile(null);
+              }}
               data-subprofile-drop="__none__"
               onDragOver={(e) => {
                 e.preventDefault();
@@ -1432,50 +1188,469 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
                 const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
                 if (exerciseName && onUpdateExerciseSubProfile && activeProfile) {
                   await onUpdateExerciseSubProfile(exerciseName, activeProfile, null);
-                  setDragFeedbackMessage(`Removed "${exerciseName}" from sub-folder`);
+                  setDragFeedbackMessage(`Removed "${exerciseName}" from "${activeSubProfile}"`);
                   setTimeout(() => setDragFeedbackMessage(null), 3000);
                 }
                 setDraggingExercise(null);
                 setDragOverSubProfile(null);
               }}
-              className={`p-3 rounded-xl border-2 border-dashed text-center text-xs font-semibold transition-all ${
+              className={`group inline-flex items-center gap-2 text-xs uppercase tracking-widest transition-all mb-4 font-medium px-3 py-1.5 rounded-xl ${
                 dragOverSubProfile === '__none__'
-                  ? 'bg-[#CC6543]/25 border-[#CC6543] text-white scale-[1.01] ring-2 ring-[#CC6543]/50 shadow-lg'
-                  : 'border-[#383530] text-[#A8A297] hover:border-[#CC6543]/60 bg-[#191816]/60'
+                  ? 'bg-[#CC6543] text-white scale-105 shadow-lg'
+                  : draggingExercise
+                  ? 'bg-[#CC6543]/15 text-[#CC6543] border border-dashed border-[#CC6543]'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] active:scale-95'
               }`}
             >
-              <span>📥 Drop here to remove from sub-folder (Keep in {activeProfile} General)</span>
-            </div>
-          )}
-
-          {/* Sub-Folders Filter Chips / Drop Targets Bar */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-            {/* 1. "All" Chip */}
-            <button
-              type="button"
-              onClick={() => setActiveSubProfile(null)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1.5 ${
-                activeSubProfile === null
-                  ? 'bg-[#CC6543] text-white shadow-md shadow-[#CC6543]/20'
-                  : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white hover:border-[#4D4740]'
-              }`}
-            >
-              <span>All</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  activeSubProfile === null ? 'bg-white/20 text-white' : 'bg-[#191816] text-[#706B62]'
-                }`}
-              >
-                {subProfileCounts.all}
+              <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" />
+              <span>
+                {draggingExercise ? `📥 Drop here to remove from ${activeSubProfile}` : `Back to ${activeProfile}`}
               </span>
             </button>
 
-            {/* 2. "General" Chip */}
-            {currentSubProfiles.length > 0 && (
-              <button
-                type="button"
+            {/* Sub-Folder Header */}
+            <div className="pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#CC6543]/15 text-[#CC6543] flex items-center justify-center shrink-0">
+                    <Folder className="w-5 h-5" />
+                  </div>
+
+                  {editingSubProfile === activeSubProfile ? (
+                    <form
+                      onSubmit={(e) => handleSaveRenameSubProfile(e, activeSubProfile)}
+                      className="flex items-center gap-2 flex-wrap animate-pop-in flex-1"
+                    >
+                      <input
+                        type="text"
+                        value={editSubProfileName}
+                        onChange={(e) => setEditSubProfileName(e.target.value)}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') handleCancelRenameSubProfile();
+                        }}
+                        className="bg-[#191816] border border-[#CC6543] rounded-xl px-3 py-1.5 text-2xl sm:text-4xl font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#CC6543] max-w-sm w-full"
+                        placeholder="Sub-folder name..."
+                      />
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="submit"
+                          className="p-2 rounded-xl bg-[#CC6543] hover:bg-[#DE7C5A] text-white transition active:scale-95 shadow-md shadow-[#CC6543]/25"
+                          title="Save sub-folder name"
+                        >
+                          <Check className="w-4 h-4 stroke-[3]" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCancelRenameSubProfile()}
+                          className="p-2 rounded-xl bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white transition active:scale-95"
+                          title="Cancel"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#F5F2EB] leading-tight">
+                        {activeSubProfile}
+                      </h1>
+                      {onRenameSubProfile && (
+                        <button
+                          onClick={(e) => handleStartRenameSubProfile(e, activeSubProfile)}
+                          className="p-1.5 rounded-lg text-[#706B62] hover:text-[#CC6543] hover:bg-[#CC6543]/10 transition-colors"
+                          title="Rename sub-folder"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onDeleteSubProfile && (
+                        deleteConfirmSubProfile === activeSubProfile ? (
+                          <div className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2.5 py-1 rounded-full animate-pop-in">
+                            <span className="text-[10px] text-[#F5B5B5]">Delete sub-folder?</span>
+                            <button
+                              onClick={(e) => handleConfirmDeleteSubProfile(e, activeSubProfile)}
+                              className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmSubProfile(null)}
+                              className="text-[10px] text-[#A8A297] hover:text-white"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={(e) => handleDeleteSubProfileClick(e, activeSubProfile)}
+                            className="p-1.5 rounded-lg text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors"
+                            title="Delete sub-folder"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-2 text-xs text-[#A8A297]">
+                  <span className="text-[#CC6543] font-semibold uppercase tracking-wider">{activeProfile}</span>
+                  <span>•</span>
+                  <span>
+                    {filteredSummaries.length === 0
+                      ? 'No exercises in this sub-folder'
+                      : `${filteredSummaries.length} exercise${filteredSummaries.length === 1 ? '' : 's'}`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Controls: Search & Select */}
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                {currentSummaries.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isSelecting) exitSelectionMode();
+                      else setIsSelecting(true);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                      isSelecting
+                        ? 'bg-[#CC6543] text-white shadow-sm'
+                        : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white'
+                    }`}
+                  >
+                    {isSelecting ? 'Done' : 'Select'}
+                  </button>
+                )}
+
+                <div className="relative flex-1 sm:w-56">
+                  <Search className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-[#706B62]" />
+                  <input
+                    type="text"
+                    placeholder="Search in sub-folder..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-transparent border-b border-[#383530] focus:border-[#CC6543] pl-6 pr-2 py-1.5 text-sm text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Exercises in Sub-Folder */}
+          <div className="space-y-4">
+            {filteredSummaries.length > 0 ? (
+              <div className="divide-y divide-[#2E2B26]">
+                {filteredSummaries.map(renderExerciseRow)}
+              </div>
+            ) : (
+              <div className="text-center py-16 px-4 rounded-2xl bg-[#252320]/40 border border-dashed border-[#383530] flex flex-col items-center justify-center space-y-3">
+                <Folder className="w-10 h-10 text-[#706B62]" />
+                <p className="text-sm font-semibold text-[#F5F2EB]">
+                  {searchQuery ? 'No matching exercises found' : 'This sub-folder is empty'}
+                </p>
+                <p className="text-xs text-[#A8A297] max-w-sm">
+                  {searchQuery
+                    ? 'Try adjusting your search query'
+                    : `Go back to ${activeProfile} and drag exercises onto the "${activeSubProfile}" card, or use Select mode.`}
+                </p>
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setActiveSubProfile(null);
+                  }}
+                  className="mt-2 px-4 py-2 rounded-xl bg-[#252320] border border-[#383530] text-xs text-white hover:border-[#CC6543] transition"
+                >
+                  Return to {activeProfile}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Drag Action Feedback Toast */}
+          {dragFeedbackMessage && (
+            <div className="fixed top-6 right-6 z-[999999] px-4 py-2.5 rounded-xl bg-[#252320] border border-[#789D74] text-[#B8D4B5] text-xs font-semibold shadow-2xl flex items-center gap-2 animate-pop-in">
+              <Check className="w-4 h-4 text-[#789D74]" />
+              <span>{dragFeedbackMessage}</span>
+            </div>
+          )}
+
+          {/* Bulk Action Bar */}
+          {renderBulkActionBar()}
+        </div>
+      );
+    }
+
+    // SUB-VIEW 1A: PROFILE ROOT (SUB-FOLDERS CARDS GRID + GENERAL EXERCISES LIST)
+    return (
+      <div className="min-h-[85vh] flex flex-col justify-center max-w-3xl mx-auto px-4 py-8 select-none animate-slide-up font-sans space-y-10">
+        {/* Back Button / Drop target to remove from this profile */}
+        <div>
+          <button
+            onClick={() => {
+              exitSelectionMode();
+              setActiveProfile(null);
+            }}
+            data-profile-drop="__none__"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              if (dragOverProfile !== '__none__') setDragOverProfile('__none__');
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              if (dragOverProfile === '__none__') setDragOverProfile(null);
+            }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
+              if (exerciseName && onBulkUpdateExerciseProfile) {
+                await onBulkUpdateExerciseProfile([exerciseName], null);
+                setDragFeedbackMessage(`Moved "${exerciseName}" out of "${activeProfile}" to General`);
+                setTimeout(() => setDragFeedbackMessage(null), 3000);
+              }
+              setDraggingExercise(null);
+              setDragOverProfile(null);
+            }}
+            className={`group inline-flex items-center gap-2 text-xs uppercase tracking-widest transition-all mb-4 font-medium px-3 py-1.5 rounded-xl ${
+              dragOverProfile === '__none__'
+                ? 'bg-[#CC6543] text-white scale-105 shadow-lg'
+                : draggingExercise
+                ? 'bg-[#CC6543]/15 text-[#CC6543] border border-dashed border-[#CC6543]'
+                : 'text-[#A8A297] hover:text-[#F5F2EB] active:scale-95'
+            }`}
+          >
+            <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" />
+            <span>
+              {draggingExercise ? '📥 Drop here to move back to General' : 'Back to Exercises'}
+            </span>
+          </button>
+
+          {/* Profile Header */}
+          <div className="pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#CC6543]/15 text-[#CC6543] flex items-center justify-center shrink-0">
+                  <Folder className="w-5 h-5" />
+                </div>
+
+                {editingProfile === activeProfile ? (
+                  <form
+                    onSubmit={(e) => handleSaveRename(e, activeProfile)}
+                    className="flex items-center gap-2 flex-wrap animate-pop-in flex-1"
+                  >
+                    <input
+                      type="text"
+                      value={editProfileName}
+                      onChange={(e) => setEditProfileName(e.target.value)}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') handleCancelRename();
+                      }}
+                      className="bg-[#191816] border border-[#CC6543] rounded-xl px-3 py-1.5 text-2xl sm:text-4xl font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#CC6543] max-w-sm w-full"
+                      placeholder="Profile name..."
+                    />
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="submit"
+                        className="p-2 rounded-xl bg-[#CC6543] hover:bg-[#DE7C5A] text-white transition active:scale-95 shadow-md shadow-[#CC6543]/25"
+                        title="Save profile name"
+                      >
+                        <Check className="w-4 h-4 stroke-[3]" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCancelRename()}
+                        className="p-2 rounded-xl bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white transition active:scale-95"
+                        title="Cancel"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex items-center gap-2.5 group/title flex-wrap">
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[#F5F2EB] leading-tight">
+                      {activeProfile}
+                    </h1>
+
+                    {/* Profile Rename Button */}
+                    {onRenameProfile && (
+                      <button
+                        onClick={(e) => handleStartRename(e, activeProfile)}
+                        className="p-1.5 rounded-lg text-[#706B62] hover:text-[#CC6543] hover:bg-[#2E2B27] transition-all opacity-80 group-hover/title:opacity-100"
+                        title={`Rename "${activeProfile}" profile`}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {/* Profile Delete in Drilldown Header */}
+                    {onDeleteProfile && (
+                      deleteConfirmProfile === activeProfile ? (
+                        <div className="flex items-center gap-2 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-3 py-1 rounded-full animate-pop-in ml-1">
+                          <span className="text-[11px] text-[#F5B5B5] font-semibold">Delete Profile?</span>
+                          <button
+                            onClick={(e) => handleConfirmDeleteProfile(e, activeProfile)}
+                            className="text-[11px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirmProfile(null);
+                            }}
+                            className="text-[11px] text-[#A8A297] hover:text-white"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => handleDeleteProfileClick(e, activeProfile)}
+                          className="p-1.5 rounded-lg text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors ml-1"
+                          title={`Delete "${activeProfile}" profile`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-[#A8A297] mt-2">
+                {activeProfileWorkouts.length === 0
+                  ? 'No exercises recorded in this profile'
+                  : `${activeProfileWorkouts.length} total entries recorded in ${activeProfile}`}
+              </p>
+            </div>
+
+            {/* Search & Bulk Select Trigger */}
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              {currentSummaries.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSelecting) exitSelectionMode();
+                    else setIsSelecting(true);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                    isSelecting
+                      ? 'bg-[#CC6543] text-white shadow-sm'
+                      : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white'
+                  }`}
+                >
+                  {isSelecting ? 'Done' : 'Select'}
+                </button>
+              )}
+
+              {activeProfileWorkouts.length > 0 && (
+                <div className="relative flex-1 sm:w-56">
+                  <Search className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-[#706B62]" />
+                  <input
+                    type="text"
+                    placeholder={`Search in ${activeProfile}...`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-transparent border-b border-[#383530] focus:border-[#CC6543] pl-6 pr-2 py-1.5 text-sm text-[#F5F2EB] placeholder-[#524E48] focus:outline-none transition-colors"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 1: SUB-FOLDERS BOXES (EXACT SAME AS WORKOUT PROFILES ON FRONT PAGE) */}
+        {(subProfileCards.length > 0 || isCreatingSubProfile) && !isSelecting && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs uppercase tracking-widest text-[#A8A297] font-semibold">
+                Sub-Folders
+              </span>
+              {!isCreatingSubProfile && onCreateSubProfile && (
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingSubProfile(true)}
+                  className="inline-flex items-center gap-1.5 text-xs text-[#CC6543] hover:text-[#DE7C5A] font-semibold transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ New Sub-Folder</span>
+                </button>
+              )}
+            </div>
+
+            {/* Inline Create Form */}
+            {isCreatingSubProfile && (
+              <form
+                onSubmit={handleCreateSubProfile}
+                className="p-3 bg-[#252320]/90 border border-[#CC6543] rounded-2xl flex items-center gap-2 animate-pop-in shadow-xl"
+              >
+                <Folder className="w-4 h-4 text-[#CC6543] shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Sub-folder name (e.g. Not Enough Sleep Day, Heavy Day)..."
+                  value={newSubProfileName}
+                  onChange={(e) => setNewSubProfileName(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setIsCreatingSubProfile(false);
+                      setNewSubProfileName('');
+                    }
+                  }}
+                  className="bg-transparent border-none focus:outline-none text-sm text-[#F5F2EB] placeholder-[#706B62] flex-1"
+                />
+                <button
+                  type="submit"
+                  disabled={!newSubProfileName.trim()}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#CC6543] hover:bg-[#DE7C5A] disabled:opacity-40 text-white text-xs font-bold transition flex items-center gap-1"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Create</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreatingSubProfile(false);
+                    setNewSubProfileName('');
+                  }}
+                  className="p-1.5 text-[#A8A297] hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </form>
+            )}
+
+            {/* Active Drag Instructions Banner inside Profile */}
+            {draggingExercise && (
+              <div className="p-3.5 rounded-xl bg-[#CC6543]/15 border border-[#CC6543]/40 text-[#DE7C5A] flex items-center justify-between text-xs animate-slide-up shadow-lg">
+                <div className="flex items-center gap-2 font-medium">
+                  <FolderPlus className="w-4 h-4 text-[#CC6543] animate-bounce shrink-0" />
+                  <span>
+                    Drop <strong>"{draggingExercise}"</strong> into any sub-folder below.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraggingExercise(null);
+                    setDragOverSubProfile(null);
+                    setTouchPosition(null);
+                  }}
+                  className="text-xs text-[#A8A297] hover:text-white underline ml-2 shrink-0"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {/* Drop Target to remove from sub-folder (Make General in this Profile) */}
+            {draggingExercise && (
+              <div
                 data-subprofile-drop="__none__"
-                onClick={() => setActiveSubProfile(activeSubProfile === '__general__' ? null : '__general__')}
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
@@ -1496,242 +1671,258 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
                   setDraggingExercise(null);
                   setDragOverSubProfile(null);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1.5 ${
+                className={`p-3.5 rounded-xl border-2 border-dashed text-center text-xs font-semibold transition-all ${
                   dragOverSubProfile === '__none__'
-                    ? 'bg-[#CC6543] text-white border-2 border-white scale-105 ring-2 ring-[#CC6543]'
-                    : activeSubProfile === '__general__'
-                    ? 'bg-[#CC6543]/20 border border-[#CC6543] text-[#DE7C5A]'
-                    : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white'
+                    ? 'bg-[#CC6543]/25 border-[#CC6543] text-white scale-[1.01] ring-2 ring-[#CC6543]/50 shadow-lg'
+                    : 'border-[#383530] text-[#A8A297] hover:border-[#CC6543]/60 bg-[#191816]/60'
                 }`}
               >
-                <span>General</span>
-                <span className="text-[10px] px-1.5 rounded-full bg-[#191816] text-[#706B62]">
-                  {subProfileCounts.general}
-                </span>
-              </button>
+                <span>📥 Drop here to remove from sub-folder (Keep in {activeProfile} General)</span>
+              </div>
             )}
 
-            {/* 3. Each Sub-Profile Chip */}
-            {currentSubProfiles.map((sub) => {
-              const isSelected = activeSubProfile?.toLowerCase() === sub.toLowerCase();
-              const isOver = dragOverSubProfile === sub;
-              const isEditing = editingSubProfile === sub;
-              const isConfirmingDelete = deleteConfirmSubProfile === sub;
+            {/* Grid of Sub-Folder Cards (Exact same layout & style as Profile Cards) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {subProfileCards.map((sub) => {
+                const isOverThis = dragOverSubProfile === sub.name;
 
-              if (isEditing) {
                 return (
-                  <form
-                    key={sub}
-                    onSubmit={(e) => handleSaveRenameSubProfile(e, sub)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#252320] border border-[#CC6543] shrink-0 animate-pop-in"
+                  <div
+                    key={sub.name}
+                    data-subprofile-drop={sub.name}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dragOverSubProfile !== sub.name) setDragOverSubProfile(sub.name);
+                    }}
+                    onDragLeave={(e) => {
+                      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                      if (dragOverSubProfile === sub.name) setDragOverSubProfile(null);
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
+                      if (exerciseName && onUpdateExerciseSubProfile && activeProfile) {
+                        await onUpdateExerciseSubProfile(exerciseName, activeProfile, sub.name);
+                        setDragFeedbackMessage(`Moved "${exerciseName}" into "${sub.name}"`);
+                        setTimeout(() => setDragFeedbackMessage(null), 3000);
+                      }
+                      setDraggingExercise(null);
+                      setDragOverSubProfile(null);
+                    }}
+                    onClick={() => {
+                      if (draggingExercise) return;
+                      setActiveSubProfile(sub.name);
+                      setSearchQuery('');
+                      exitSelectionMode();
+                    }}
+                    className={`group relative text-left p-5 rounded-2xl transition-all flex items-center justify-between gap-4 cursor-pointer active:scale-[0.99] ${
+                      isOverThis
+                        ? 'border-2 border-[#CC6543] bg-[#CC6543]/20 scale-[1.02] shadow-xl shadow-[#CC6543]/25 ring-2 ring-[#CC6543]/60'
+                        : draggingExercise
+                        ? 'border-2 border-dashed border-[#CC6543]/60 bg-[#CC6543]/5 hover:bg-[#CC6543]/15'
+                        : 'bg-[#252320]/80 border border-[#383530] hover:border-[#CC6543] hover:bg-[#252320]'
+                    }`}
                   >
-                    <Folder className="w-3.5 h-3.5 text-[#CC6543]" />
-                    <input
-                      type="text"
-                      value={editSubProfileName}
-                      onChange={(e) => setEditSubProfileName(e.target.value)}
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') handleCancelRenameSubProfile();
-                      }}
-                      className="bg-transparent border-none text-xs text-white focus:outline-none w-28 sm:w-36"
-                    />
-                    <button
-                      type="submit"
-                      className="p-1 text-[#CC6543] hover:text-white"
-                      title="Save"
-                    >
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleCancelRenameSubProfile()}
-                      className="p-1 text-[#A8A297] hover:text-white"
-                      title="Cancel"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </form>
-                );
-              }
+                    <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0 ${
+                          isOverThis
+                            ? 'bg-[#CC6543] text-white scale-110'
+                            : 'bg-[#CC6543]/15 text-[#CC6543] group-hover:bg-[#CC6543] group-hover:text-white'
+                        }`}
+                      >
+                        <Folder className="w-5 h-5" />
+                      </div>
 
-              return (
-                <div
-                  key={sub}
-                  data-subprofile-drop={sub}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    if (dragOverSubProfile !== sub) setDragOverSubProfile(sub);
-                  }}
-                  onDragLeave={(e) => {
-                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                    if (dragOverSubProfile === sub) setDragOverSubProfile(null);
-                  }}
-                  onDrop={async (e) => {
-                    e.preventDefault();
-                    const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
-                    if (exerciseName && onUpdateExerciseSubProfile && activeProfile) {
-                      await onUpdateExerciseSubProfile(exerciseName, activeProfile, sub);
-                      setDragFeedbackMessage(`Moved "${exerciseName}" into sub-folder "${sub}"`);
-                      setTimeout(() => setDragFeedbackMessage(null), 3000);
-                    }
-                    setDraggingExercise(null);
-                    setDragOverSubProfile(null);
-                  }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition group/sub ${
-                    isOver
-                      ? 'bg-[#CC6543] text-white border-2 border-white scale-105 shadow-md shadow-[#CC6543]/40'
-                      : isSelected
-                      ? 'bg-[#CC6543] text-white shadow-md shadow-[#CC6543]/20'
-                      : 'bg-[#252320] border border-[#383530] text-[#F5F2EB] hover:border-[#CC6543]/60'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubProfile(isSelected ? null : sub)}
-                    className="flex items-center gap-1.5 text-left"
-                  >
-                    <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-[#CC6543]'}`} />
-                    <span className="truncate max-w-[130px] sm:max-w-[180px]">{sub}</span>
-                    <span
-                      className={`text-[10px] px-1.5 rounded-full ${
-                        isSelected ? 'bg-white/20 text-white' : 'bg-[#191816] text-[#A8A297]'
-                      }`}
-                    >
-                      {subProfileCounts[sub] || 0}
-                    </span>
-                  </button>
+                      {editingSubProfile === sub.name ? (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1.5 flex-1 min-w-0 animate-pop-in mr-1"
+                        >
+                          <input
+                            type="text"
+                            value={editSubProfileName}
+                            onChange={(e) => setEditSubProfileName(e.target.value)}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveRenameSubProfile(e, sub.name);
+                              if (e.key === 'Escape') handleCancelRenameSubProfile();
+                            }}
+                            className="w-full bg-[#191816] border border-[#CC6543] rounded-lg px-2.5 py-1 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#CC6543]"
+                            placeholder="Sub-folder name..."
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => handleSaveRenameSubProfile(e, sub.name)}
+                            className="p-1.5 rounded-lg bg-[#CC6543] hover:bg-[#DE7C5A] text-white shrink-0 active:scale-95 transition"
+                            title="Save name"
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelRenameSubProfile}
+                            className="p-1.5 rounded-lg bg-[#191816] border border-[#383530] text-[#A8A297] hover:text-white shrink-0 active:scale-95 transition"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="truncate">
+                          <h3 className="text-xl font-bold text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors truncate">
+                            {sub.name}
+                          </h3>
+                          {isOverThis ? (
+                            <p className="text-xs font-bold text-[#DE7C5A] animate-pulse mt-0.5">
+                              📥 Drop to move into {sub.name}
+                            </p>
+                          ) : draggingExercise ? (
+                            <p className="text-xs text-[#CC6543] font-medium mt-0.5">
+                              Drop here to add
+                            </p>
+                          ) : (
+                            <p className="text-xs text-[#A8A297] mt-0.5">
+                              {sub.uniqueExercises} {sub.uniqueExercises === 1 ? 'exercise' : 'exercises'} · {sub.totalLogs} {sub.totalLogs === 1 ? 'session' : 'sessions'}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Actions: Inline Rename & Delete */}
-                  {!isConfirmingDelete ? (
-                    <div className="flex items-center gap-0.5 opacity-60 group-hover/sub:opacity-100 transition-opacity ml-1">
-                      {onRenameSubProfile && (
+                    {/* Right controls: Rename Sub-Profile + Delete Sub-Profile + Arrow */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {onRenameSubProfile && editingSubProfile !== sub.name && (
                         <button
                           type="button"
-                          onClick={(e) => handleStartRenameSubProfile(e, sub)}
-                          className="p-1 text-[#A8A297] hover:text-[#DE7C5A]"
-                          title={`Rename sub-folder "${sub}"`}
+                          onClick={(e) => handleStartRenameSubProfile(e, sub.name)}
+                          className="p-1.5 rounded-lg text-[#706B62] hover:text-[#CC6543] hover:bg-[#CC6543]/10 transition-colors opacity-70 group-hover:opacity-100"
+                          title={`Rename "${sub.name}" sub-folder`}
                         >
-                          <Pencil className="w-3 h-3" />
+                          <Pencil className="w-4 h-4" />
                         </button>
                       )}
+
                       {onDeleteSubProfile && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteSubProfileClick(e, sub)}
-                          className="p-1 text-[#A8A297] hover:text-red-400"
-                          title={`Delete sub-folder "${sub}"`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        deleteConfirmSubProfile === sub.name ? (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2 py-1 rounded-full animate-pop-in"
+                          >
+                            <span className="text-[10px] text-[#F5F2EB]">Delete?</span>
+                            <button
+                              onClick={(e) => handleConfirmDeleteSubProfile(e, sub.name)}
+                              className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirmSubProfile(null);
+                              }}
+                              className="text-[10px] text-[#A8A297] hover:text-white"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={(e) => handleDeleteSubProfileClick(e, sub.name)}
+                            className="p-1.5 rounded-lg text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors opacity-70 group-hover:opacity-100"
+                            title={`Delete "${sub.name}" sub-folder`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )
                       )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1 bg-[#D45B5B]/20 border border-[#D45B5B]/40 px-2 py-0.5 rounded-lg animate-pop-in ml-1">
-                      <span className="text-[10px] text-[#F5B5B5]">Delete?</span>
-                      <button
-                        type="button"
-                        onClick={(e) => handleConfirmDeleteSubProfile(e, sub)}
-                        className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
-                      >
-                        Yes
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteConfirmSubProfile(null);
-                        }}
-                        className="text-[10px] text-[#A8A297] hover:text-white"
-                      >
-                        No
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
 
-            {/* "+ New Sub-Folder" button at the end of the scroll row */}
-            {!isCreatingSubProfile && onCreateSubProfile && (
-              <button
-                type="button"
-                onClick={() => setIsCreatingSubProfile(true)}
-                className="px-3 py-1.5 rounded-xl border border-dashed border-[#383530] hover:border-[#CC6543] text-xs font-semibold text-[#A8A297] hover:text-[#CC6543] shrink-0 transition flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Sub-Folder</span>
-              </button>
+                      <div className="w-8 h-8 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A] transition-all">
+                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* If no sub-folders yet and not creating, clean prompt to add */}
+        {subProfileCards.length === 0 && !isCreatingSubProfile && onCreateSubProfile && !isSelecting && (
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#252320]/40 border border-dashed border-[#383530]">
+            <div className="flex items-center gap-2.5 text-xs text-[#A8A297]">
+              <Folder className="w-4 h-4 text-[#CC6543]" />
+              <span>Create sections (e.g. Not Enough Sleep Day / Enough Sleep Day)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCreatingSubProfile(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-[#CC6543] hover:text-[#DE7C5A] font-bold px-3 py-1.5 rounded-xl bg-[#CC6543]/10 hover:bg-[#CC6543]/20 transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add Sub-Folder</span>
+            </button>
+          </div>
+        )}
+
+        {/* SECTION 2: GENERAL EXERCISES LIST */}
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center justify-between">
+            {subProfileCards.length > 0 && currentSummaries.length > 0 && (
+              <span className="text-xs uppercase tracking-widest text-[#A8A297] font-semibold">
+                General Exercises
+              </span>
             )}
           </div>
 
-          {/* Active Filter Indicator banner */}
-          {activeSubProfile && (
-            <div className="p-2.5 rounded-xl bg-[#252320]/70 border border-[#383530] flex items-center justify-between text-xs text-[#A8A297] animate-fade-in">
-              <div className="flex items-center gap-1.5">
-                <span>Filtering by:</span>
-                <span className="font-bold text-[#DE7C5A]">
-                  {activeSubProfile === '__general__' ? 'General (No Sub-Folder)' : activeSubProfile}
-                </span>
-                <span>({filteredSummaries.length} exercises)</span>
+          {/* Selection Bar inside Profile */}
+          {isSelecting && filteredSummaries.length > 0 && (
+            <div className="flex items-center justify-between text-xs text-[#A8A297] bg-[#252320]/60 p-2.5 rounded-xl border border-[#383530]">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={selectAll}
+                  className="hover:text-white underline"
+                >
+                  Select All ({filteredSummaries.length})
+                </button>
+                <span>·</span>
+                <button
+                  onClick={deselectAll}
+                  className="hover:text-white underline"
+                >
+                  Deselect All
+                </button>
               </div>
+              <span className="text-[#CC6543] font-bold">
+                {selectedExercises.size} selected
+              </span>
+            </div>
+          )}
+
+          {/* Exercises List inside Profile */}
+          {filteredSummaries.length === 0 && subProfileCards.length === 0 ? (
+            <div className="py-16 text-center animate-pop-in">
+              <p className="text-base text-[#C8C2B7] italic mb-6">
+                No exercises logged under "{activeProfile}" yet.
+              </p>
               <button
-                type="button"
-                onClick={() => setActiveSubProfile(null)}
-                className="text-xs text-[#CC6543] hover:underline font-semibold"
+                onClick={onGoToLog}
+                className="group inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#CC6543] hover:bg-[#DE7C5A] text-white text-xs sm:text-sm font-semibold tracking-widest uppercase shadow-lg shadow-[#CC6543]/20 hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
               >
-                Show All
+                <Plus className="w-4 h-4 stroke-[2.5] transition-transform duration-200 group-hover:rotate-90" />
+                <span>Log Exercise to {activeProfile}</span>
               </button>
+            </div>
+          ) : filteredSummaries.length === 0 ? (
+            <p className="text-xs text-[#706B62] py-4">No standalone general exercises found in {activeProfile}.</p>
+          ) : (
+            <div className="divide-y divide-[#2E2B26]">
+              {filteredSummaries.map(renderExerciseRow)}
             </div>
           )}
         </div>
-
-        {/* Selection Bar inside Profile */}
-        {isSelecting && filteredSummaries.length > 0 && (
-          <div className="mb-4 flex items-center justify-between text-xs text-[#A8A297] bg-[#252320]/60 p-2.5 rounded-xl border border-[#383530]">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={selectAll}
-                className="hover:text-white underline"
-              >
-                Select All ({filteredSummaries.length})
-              </button>
-              <span>·</span>
-              <button
-                onClick={deselectAll}
-                className="hover:text-white underline"
-              >
-                Deselect All
-              </button>
-            </div>
-            <span className="text-[#CC6543] font-bold">
-              {selectedExercises.size} selected
-            </span>
-          </div>
-        )}
-
-        {/* Exercises List inside Profile */}
-        {filteredSummaries.length === 0 ? (
-          <div className="py-16 text-center animate-pop-in">
-            <p className="text-base text-[#C8C2B7] italic mb-6">
-              {activeSubProfile
-                ? `No exercises found in "${activeSubProfile}".`
-                : `No exercises logged under "${activeProfile}" yet.`}
-            </p>
-            <button
-              onClick={onGoToLog}
-              className="group inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#CC6543] hover:bg-[#DE7C5A] text-white text-xs sm:text-sm font-semibold tracking-widest uppercase shadow-lg shadow-[#CC6543]/20 hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5] transition-transform duration-200 group-hover:rotate-90" />
-              <span>Log Exercise to {activeProfile}</span>
-            </button>
-          </div>
-        ) : (
-          <div className="divide-y divide-[#2E2B26]">
-            {filteredSummaries.map(renderExerciseRow)}
-          </div>
-        )}
 
         {/* Floating Touch Drag Pill (Mobile PWA) */}
         {touchPosition && draggingExercise && (
@@ -1744,15 +1935,60 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
           </div>
         )}
 
-        {/* Drag Action Feedback Toast */}
-        {dragFeedbackMessage && (
-          <div className="fixed top-6 right-6 z-[999999] px-4 py-2.5 rounded-xl bg-[#252320] border border-[#789D74] text-[#B8D4B5] text-xs font-semibold shadow-2xl flex items-center gap-2 animate-pop-in">
-            <Check className="w-4 h-4 text-[#789D74]" />
-            <span>{dragFeedbackMessage}</span>
+        {/* Sticky Mobile Drop Tray for Sub-Folders when Dragging on Mobile */}
+        {draggingExercise && subProfileCards.length > 0 && (
+          <div className="fixed top-3 inset-x-3 z-[99999] bg-[#1E1D1A]/95 border-2 border-[#CC6543] rounded-2xl p-3 shadow-2xl backdrop-blur-md animate-slide-down sm:hidden">
+            <div className="flex items-center justify-between text-xs text-[#DE7C5A] font-bold pb-2 border-b border-[#383530]">
+              <span className="flex items-center gap-1.5 truncate">
+                <FolderPlus className="w-3.5 h-3.5 text-[#CC6543] animate-bounce shrink-0" />
+                <span className="truncate">Drop "{draggingExercise}" onto:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraggingExercise(null);
+                  setDragOverSubProfile(null);
+                  setTouchPosition(null);
+                }}
+                className="text-[#A8A297] hover:text-white p-1 ml-2 shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto py-2 no-scrollbar">
+              {/* Target: General (Root inside this profile) */}
+              <div
+                data-subprofile-drop="__none__"
+                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold shrink-0 transition-all ${
+                  dragOverSubProfile === '__none__'
+                    ? 'bg-[#CC6543] text-white border-white scale-105 shadow-md shadow-[#CC6543]/40'
+                    : 'bg-[#252320] border-[#383530] text-[#A8A297]'
+                }`}
+              >
+                General
+              </div>
+
+              {/* Sub-Folders */}
+              {subProfileCards.map((sub) => (
+                <div
+                  key={sub.name}
+                  data-subprofile-drop={sub.name}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 ${
+                    dragOverSubProfile === sub.name
+                      ? 'bg-[#CC6543] text-white border-white scale-105 shadow-md shadow-[#CC6543]/40'
+                      : 'bg-[#252320] border-[#383530] text-[#F5F2EB]'
+                  }`}
+                >
+                  <Folder className="w-3.5 h-3.5 text-[#CC6543]" />
+                  <span>{sub.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Mobile Tap-to-Move Sub-Folder Native Bottom Sheet Modal */}
+        {/* Mobile Quick Sub-Profile Sheet Modal */}
         {mobileSubProfileExercise && activeProfile && (
           <div
             onClick={() => setMobileSubProfileExercise(null)}
@@ -1884,6 +2120,14 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Drag Action Feedback Toast */}
+        {dragFeedbackMessage && (
+          <div className="fixed top-6 right-6 z-[999999] px-4 py-2.5 rounded-xl bg-[#252320] border border-[#789D74] text-[#B8D4B5] text-xs font-semibold shadow-2xl flex items-center gap-2 animate-pop-in">
+            <Check className="w-4 h-4 text-[#789D74]" />
+            <span>{dragFeedbackMessage}</span>
           </div>
         )}
 
