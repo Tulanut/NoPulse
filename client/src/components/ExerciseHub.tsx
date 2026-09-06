@@ -12,6 +12,7 @@ import {
   X,
   Pencil,
   Check,
+  GripVertical,
 } from 'lucide-react';
 import { Workout } from '../types/workout';
 import { formatSpelledDate } from '../utils/dateUtils';
@@ -62,6 +63,50 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   // Profile Inline Rename State
   const [editingProfile, setEditingProfile] = useState<string | null>(null);
   const [editProfileName, setEditProfileName] = useState('');
+
+  // Drag and Drop State (Desktop & Mobile Touch)
+  const [draggingExercise, setDraggingExercise] = useState<string | null>(null);
+  const [dragOverProfile, setDragOverProfile] = useState<string | null>(null);
+  const [touchPosition, setTouchPosition] = useState<{ x: number; y: number } | null>(null);
+  const [dragFeedbackMessage, setDragFeedbackMessage] = useState<string | null>(null);
+
+  // Touch Drag Handlers for Mobile PWA
+  const handleTouchStart = (e: React.TouchEvent, exerciseName: string) => {
+    if (isSelecting) return;
+    const touch = e.touches[0];
+    setDraggingExercise(exerciseName);
+    setTouchPosition({ x: touch.clientX, y: touch.clientY });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!draggingExercise) return;
+    const touch = e.touches[0];
+    setTouchPosition({ x: touch.clientX, y: touch.clientY });
+
+    const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+    const dropZone = elem?.closest('[data-profile-drop]');
+    if (dropZone) {
+      const targetProfile = dropZone.getAttribute('data-profile-drop');
+      setDragOverProfile(targetProfile);
+    } else {
+      setDragOverProfile(null);
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (!draggingExercise) return;
+    if (dragOverProfile && onBulkUpdateExerciseProfile) {
+      const target = dragOverProfile === '__none__' ? null : dragOverProfile;
+      await onBulkUpdateExerciseProfile([draggingExercise], target);
+      setDragFeedbackMessage(
+        target ? `Moved "${draggingExercise}" into "${target}"` : `Moved "${draggingExercise}" to General Exercises`
+      );
+      setTimeout(() => setDragFeedbackMessage(null), 3000);
+    }
+    setDraggingExercise(null);
+    setDragOverProfile(null);
+    setTouchPosition(null);
+  };
 
   // Bulk Selection State
   const [isSelecting, setIsSelecting] = useState(false);
@@ -304,18 +349,44 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   // Render Exercise Item Row
   const renderExerciseRow = (item: ExerciseSummary) => {
     const isChecked = selectedExercises.has(item.name);
+    const isBeingDragged = draggingExercise === item.name;
 
     return (
       <div
         key={item.name}
-        className={`py-5 flex items-center justify-between gap-4 transition-all duration-200 group rounded-xl px-2.5 -mx-2.5 ${
-          isSelecting
+        draggable={!isSelecting}
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', item.name);
+          e.dataTransfer.effectAllowed = 'move';
+          setDraggingExercise(item.name);
+        }}
+        onDragEnd={() => {
+          setDraggingExercise(null);
+          setDragOverProfile(null);
+        }}
+        className={`py-5 flex items-center justify-between gap-3 transition-all duration-200 group rounded-xl px-2.5 -mx-2.5 ${
+          isBeingDragged
+            ? 'opacity-35 scale-[0.98] border border-dashed border-[#CC6543] bg-[#CC6543]/5'
+            : isSelecting
             ? isChecked
               ? 'bg-[#CC6543]/10 border border-[#CC6543]/40'
               : 'hover:bg-[#252320]/60 border border-transparent'
             : 'hover:translate-x-1'
         }`}
       >
+        {/* Grip Handle for Drag & Drop (Desktop + Mobile Touch) */}
+        {!isSelecting && (
+          <div
+            className="cursor-grab active:cursor-grabbing text-[#706B62] hover:text-[#CC6543] p-1.5 -ml-1 rounded-lg transition-colors shrink-0 touch-none group-hover:text-[#A8A297]"
+            title="Drag and drop into a profile folder"
+            onTouchStart={(e) => handleTouchStart(e, item.name)}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <GripVertical className="w-4 h-4" />
+          </div>
+        )}
+
         {/* If in selection mode, show checkbox */}
         {isSelecting && (
           <button
@@ -571,16 +642,45 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   if (activeProfile) {
     return (
       <div className="min-h-[85vh] flex flex-col justify-center max-w-3xl mx-auto px-4 py-8 select-none animate-slide-up font-sans">
-        {/* Back Button */}
+        {/* Back Button / Drop target to remove from this profile */}
         <button
           onClick={() => {
             exitSelectionMode();
             setActiveProfile(null);
           }}
-          className="group inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[#A8A297] hover:text-[#F5F2EB] active:scale-95 transition-all mb-4 font-medium"
+          data-profile-drop="__none__"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (dragOverProfile !== '__none__') setDragOverProfile('__none__');
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+            if (dragOverProfile === '__none__') setDragOverProfile(null);
+          }}
+          onDrop={async (e) => {
+            e.preventDefault();
+            const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
+            if (exerciseName && onBulkUpdateExerciseProfile) {
+              await onBulkUpdateExerciseProfile([exerciseName], null);
+              setDragFeedbackMessage(`Moved "${exerciseName}" out of "${activeProfile}" to General`);
+              setTimeout(() => setDragFeedbackMessage(null), 3000);
+            }
+            setDraggingExercise(null);
+            setDragOverProfile(null);
+          }}
+          className={`group inline-flex items-center gap-2 text-xs uppercase tracking-widest transition-all mb-4 font-medium px-3 py-1.5 rounded-xl ${
+            dragOverProfile === '__none__'
+              ? 'bg-[#CC6543] text-white scale-105 shadow-lg'
+              : draggingExercise
+              ? 'bg-[#CC6543]/15 text-[#CC6543] border border-dashed border-[#CC6543]'
+              : 'text-[#A8A297] hover:text-[#F5F2EB] active:scale-95'
+          }`}
         >
           <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" />
-          <span>Back to Exercises</span>
+          <span>
+            {draggingExercise ? '📥 Drop here to move back to General' : 'Back to Exercises'}
+          </span>
         </button>
 
         {/* Profile Header */}
@@ -764,6 +864,25 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
           </div>
         )}
 
+        {/* Floating Touch Drag Pill (Mobile PWA) */}
+        {touchPosition && draggingExercise && (
+          <div
+            style={{ left: touchPosition.x, top: touchPosition.y - 45 }}
+            className="fixed pointer-events-none z-[999999] px-3.5 py-2 rounded-2xl bg-[#CC6543] text-white text-xs font-bold shadow-2xl flex items-center gap-2 -translate-x-1/2 -translate-y-1/2 border border-white/25 backdrop-blur-md animate-pop-in"
+          >
+            <Folder className="w-3.5 h-3.5" />
+            <span>Moving: {draggingExercise}</span>
+          </div>
+        )}
+
+        {/* Drag Action Feedback Toast */}
+        {dragFeedbackMessage && (
+          <div className="fixed top-6 right-6 z-[999999] px-4 py-2.5 rounded-xl bg-[#252320] border border-[#789D74] text-[#B8D4B5] text-xs font-semibold shadow-2xl flex items-center gap-2 animate-pop-in">
+            <Check className="w-4 h-4 text-[#789D74]" />
+            <span>{dragFeedbackMessage}</span>
+          </div>
+        )}
+
         {/* Bulk Action Bar */}
         {renderBulkActionBar()}
       </div>
@@ -831,80 +950,184 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {profileCards.map((p) => (
-              <div
-                key={p.name}
+          {/* Active Drag Instructions Banner */}
+          {draggingExercise && (
+            <div className="p-3.5 rounded-xl bg-[#CC6543]/15 border border-[#CC6543]/40 text-[#DE7C5A] flex items-center justify-between text-xs animate-slide-up shadow-lg">
+              <div className="flex items-center gap-2 font-medium">
+                <FolderPlus className="w-4 h-4 text-[#CC6543] animate-bounce shrink-0" />
+                <span>
+                  Drop <strong>"{draggingExercise}"</strong> into any profile folder below.
+                </span>
+              </div>
+              <button
+                type="button"
                 onClick={() => {
-                  setActiveProfile(p.name);
-                  setSearchQuery('');
-                  exitSelectionMode();
+                  setDraggingExercise(null);
+                  setDragOverProfile(null);
+                  setTouchPosition(null);
                 }}
-                className="group relative text-left p-5 rounded-2xl bg-[#252320]/80 border border-[#383530] hover:border-[#CC6543] hover:bg-[#252320] transition-all flex items-center justify-between gap-4 cursor-pointer active:scale-[0.99]"
+                className="text-xs text-[#A8A297] hover:text-white underline ml-2 shrink-0"
               >
-                <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-[#CC6543]/15 text-[#CC6543] group-hover:bg-[#CC6543] group-hover:text-white flex items-center justify-center transition-all shrink-0">
-                    <Folder className="w-5 h-5" />
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {/* Drop Target to Make Exercise General (Unassigned) */}
+          {draggingExercise && (
+            <div
+              data-profile-drop="__none__"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOverProfile !== '__none__') setDragOverProfile('__none__');
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                if (dragOverProfile === '__none__') setDragOverProfile(null);
+              }}
+              onDrop={async (e) => {
+                e.preventDefault();
+                const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
+                if (exerciseName && onBulkUpdateExerciseProfile) {
+                  await onBulkUpdateExerciseProfile([exerciseName], null);
+                  setDragFeedbackMessage(`Moved "${exerciseName}" to General Exercises`);
+                  setTimeout(() => setDragFeedbackMessage(null), 3000);
+                }
+                setDraggingExercise(null);
+                setDragOverProfile(null);
+              }}
+              className={`p-3.5 rounded-xl border-2 border-dashed text-center text-xs font-semibold transition-all ${
+                dragOverProfile === '__none__'
+                  ? 'bg-[#CC6543]/25 border-[#CC6543] text-white scale-[1.01] ring-2 ring-[#CC6543]/50 shadow-lg'
+                  : 'border-[#383530] text-[#A8A297] hover:border-[#CC6543]/60 bg-[#191816]/60'
+              }`}
+            >
+              <span>📥 Drop here to remove from folder (Make General Exercise)</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {profileCards.map((p) => {
+              const isOverThis = dragOverProfile === p.name;
+
+              return (
+                <div
+                  key={p.name}
+                  data-profile-drop={p.name}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverProfile !== p.name) setDragOverProfile(p.name);
+                  }}
+                  onDragLeave={(e) => {
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    if (dragOverProfile === p.name) setDragOverProfile(null);
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
+                    if (exerciseName && onBulkUpdateExerciseProfile) {
+                      await onBulkUpdateExerciseProfile([exerciseName], p.name);
+                      setDragFeedbackMessage(`Moved "${exerciseName}" into "${p.name}"`);
+                      setTimeout(() => setDragFeedbackMessage(null), 3000);
+                    }
+                    setDraggingExercise(null);
+                    setDragOverProfile(null);
+                  }}
+                  onClick={() => {
+                    if (draggingExercise) return;
+                    setActiveProfile(p.name);
+                    setSearchQuery('');
+                    exitSelectionMode();
+                  }}
+                  className={`group relative text-left p-5 rounded-2xl transition-all flex items-center justify-between gap-4 cursor-pointer active:scale-[0.99] ${
+                    isOverThis
+                      ? 'border-2 border-[#CC6543] bg-[#CC6543]/20 scale-[1.02] shadow-xl shadow-[#CC6543]/25 ring-2 ring-[#CC6543]/60'
+                      : draggingExercise
+                      ? 'border-2 border-dashed border-[#CC6543]/60 bg-[#CC6543]/5 hover:bg-[#CC6543]/15'
+                      : 'bg-[#252320]/80 border border-[#383530] hover:border-[#CC6543] hover:bg-[#252320]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0 ${
+                        isOverThis
+                          ? 'bg-[#CC6543] text-white scale-110'
+                          : 'bg-[#CC6543]/15 text-[#CC6543] group-hover:bg-[#CC6543] group-hover:text-white'
+                      }`}
+                    >
+                      <Folder className="w-5 h-5" />
+                    </div>
+
+                    {editingProfile === p.name ? (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1.5 flex-1 min-w-0 animate-pop-in mr-1"
+                      >
+                        <input
+                          type="text"
+                          value={editProfileName}
+                          onChange={(e) => setEditProfileName(e.target.value)}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveRename(e, p.name);
+                            if (e.key === 'Escape') handleCancelRename();
+                          }}
+                          className="w-full bg-[#191816] border border-[#CC6543] rounded-lg px-2.5 py-1 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#CC6543]"
+                          placeholder="Profile name..."
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => handleSaveRename(e, p.name)}
+                          className="p-1.5 rounded-lg bg-[#CC6543] hover:bg-[#DE7C5A] text-white shrink-0 active:scale-95 transition"
+                          title="Save name"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelRename}
+                          className="p-1.5 rounded-lg bg-[#191816] border border-[#383530] text-[#A8A297] hover:text-white shrink-0 active:scale-95 transition"
+                          title="Cancel"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="truncate">
+                        <h3 className="text-xl font-bold text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors truncate">
+                          {p.name}
+                        </h3>
+                        {isOverThis ? (
+                          <p className="text-xs font-bold text-[#DE7C5A] animate-pulse mt-0.5">
+                            📥 Drop to move into {p.name}
+                          </p>
+                        ) : draggingExercise ? (
+                          <p className="text-xs text-[#CC6543] font-medium mt-0.5">
+                            Drop here to add
+                          </p>
+                        ) : (
+                          <p className="text-xs text-[#A8A297] mt-0.5">
+                            {p.uniqueExercises} {p.uniqueExercises === 1 ? 'exercise' : 'exercises'} · {p.totalLogs} {p.totalLogs === 1 ? 'session' : 'sessions'}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  {editingProfile === p.name ? (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1.5 flex-1 min-w-0 animate-pop-in mr-1"
-                    >
-                      <input
-                        type="text"
-                        value={editProfileName}
-                        onChange={(e) => setEditProfileName(e.target.value)}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveRename(e, p.name);
-                          if (e.key === 'Escape') handleCancelRename();
-                        }}
-                        className="w-full bg-[#191816] border border-[#CC6543] rounded-lg px-2.5 py-1 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#CC6543]"
-                        placeholder="Profile name..."
-                      />
+                  {/* Right controls: Rename Profile + Delete Profile + Arrow */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {onRenameProfile && editingProfile !== p.name && (
                       <button
                         type="button"
-                        onClick={(e) => handleSaveRename(e, p.name)}
-                        className="p-1.5 rounded-lg bg-[#CC6543] hover:bg-[#DE7C5A] text-white shrink-0 active:scale-95 transition"
-                        title="Save name"
+                        onClick={(e) => handleStartRename(e, p.name)}
+                        className="p-1.5 rounded-lg text-[#706B62] hover:text-[#CC6543] hover:bg-[#CC6543]/10 transition-colors opacity-70 group-hover:opacity-100"
+                        title={`Rename "${p.name}" profile`}
                       >
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <Pencil className="w-4 h-4" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleCancelRename}
-                        className="p-1.5 rounded-lg bg-[#191816] border border-[#383530] text-[#A8A297] hover:text-white shrink-0 active:scale-95 transition"
-                        title="Cancel"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="truncate">
-                      <h3 className="text-xl font-bold text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors truncate">
-                        {p.name}
-                      </h3>
-                      <p className="text-xs text-[#A8A297] mt-0.5">
-                        {p.uniqueExercises} {p.uniqueExercises === 1 ? 'exercise' : 'exercises'} · {p.totalLogs} {p.totalLogs === 1 ? 'session' : 'sessions'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right controls: Rename Profile + Delete Profile + Arrow */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {onRenameProfile && editingProfile !== p.name && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleStartRename(e, p.name)}
-                      className="p-1.5 rounded-lg text-[#706B62] hover:text-[#CC6543] hover:bg-[#CC6543]/10 transition-colors opacity-70 group-hover:opacity-100"
-                      title={`Rename "${p.name}" profile`}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  )}
+                    )}
 
                   {onDeleteProfile && (
                     deleteConfirmProfile === p.name ? (
@@ -945,7 +1168,8 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
                   </div>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         </div>
       )}
@@ -1006,6 +1230,25 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
           </div>
         )}
       </div>
+
+      {/* Floating Touch Drag Pill (Mobile PWA) */}
+      {touchPosition && draggingExercise && (
+        <div
+          style={{ left: touchPosition.x, top: touchPosition.y - 45 }}
+          className="fixed pointer-events-none z-[999999] px-3.5 py-2 rounded-2xl bg-[#CC6543] text-white text-xs font-bold shadow-2xl flex items-center gap-2 -translate-x-1/2 -translate-y-1/2 border border-white/25 backdrop-blur-md animate-pop-in"
+        >
+          <Folder className="w-3.5 h-3.5" />
+          <span>Moving: {draggingExercise}</span>
+        </div>
+      )}
+
+      {/* Drag Action Feedback Toast */}
+      {dragFeedbackMessage && (
+        <div className="fixed top-6 right-6 z-[999999] px-4 py-2.5 rounded-xl bg-[#252320] border border-[#789D74] text-[#B8D4B5] text-xs font-semibold shadow-2xl flex items-center gap-2 animate-pop-in">
+          <Check className="w-4 h-4 text-[#789D74]" />
+          <span>{dragFeedbackMessage}</span>
+        </div>
+      )}
 
       {/* Bulk Action Bar */}
       {renderBulkActionBar()}
