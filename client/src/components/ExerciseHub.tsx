@@ -70,18 +70,37 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   const [touchPosition, setTouchPosition] = useState<{ x: number; y: number } | null>(null);
   const [dragFeedbackMessage, setDragFeedbackMessage] = useState<string | null>(null);
 
-  // Touch Drag Handlers for Mobile PWA
+  // Mobile Tap-to-Move Bottom Sheet State
+  const [mobileMoveExercise, setMobileMoveExercise] = useState<string | null>(null);
+
+  // Touch Drag Handlers with Auto-Scroll & Haptics for Mobile PWA
   const handleTouchStart = (e: React.TouchEvent, exerciseName: string) => {
     if (isSelecting) return;
     const touch = e.touches[0];
     setDraggingExercise(exerciseName);
     setTouchPosition({ x: touch.clientX, y: touch.clientY });
+
+    // Haptic feedback if supported on mobile device
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(30);
+      } catch {
+        // ignore
+      }
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!draggingExercise) return;
     const touch = e.touches[0];
     setTouchPosition({ x: touch.clientX, y: touch.clientY });
+
+    // Mobile Edge Auto-Scroll (allows dragging across long exercise lists)
+    if (touch.clientY < 90) {
+      window.scrollBy({ top: -14, behavior: 'auto' });
+    } else if (touch.clientY > window.innerHeight - 90) {
+      window.scrollBy({ top: 14, behavior: 'auto' });
+    }
 
     const elem = document.elementFromPoint(touch.clientX, touch.clientY);
     const dropZone = elem?.closest('[data-profile-drop]');
@@ -98,6 +117,15 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     if (dragOverProfile && onBulkUpdateExerciseProfile) {
       const target = dragOverProfile === '__none__' ? null : dragOverProfile;
       await onBulkUpdateExerciseProfile([draggingExercise], target);
+
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate([15, 35, 15]);
+        } catch {
+          // ignore
+        }
+      }
+
       setDragFeedbackMessage(
         target ? `Moved "${draggingExercise}" into "${target}"` : `Moved "${draggingExercise}" to General Exercises`
       );
@@ -444,6 +472,21 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         {/* Normal Actions (hidden during selection) */}
         {!isSelecting && (
           <div className="flex items-center gap-2 shrink-0">
+            {/* Quick Move to Profile Button for Mobile */}
+            {onBulkUpdateExerciseProfile && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMobileMoveExercise(item.name);
+                }}
+                className="sm:hidden p-2 rounded-full text-[#706B62] hover:text-[#CC6543] hover:bg-[#CC6543]/10 transition-colors"
+                title={`Move ${item.name} to a profile`}
+              >
+                <FolderPlus className="w-4 h-4 text-[#CC6543]" />
+              </button>
+            )}
+
             {onDeleteExercise && (
               deleteConfirmExercise === item.name ? (
                 <div className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2.5 py-1 rounded-full animate-pop-in">
@@ -1239,6 +1282,136 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         >
           <Folder className="w-3.5 h-3.5" />
           <span>Moving: {draggingExercise}</span>
+        </div>
+      )}
+
+      {/* Sticky Mobile Drop Tray (Appears at top of mobile screen when dragging so users don't have to scroll) */}
+      {draggingExercise && (
+        <div className="fixed top-3 inset-x-3 z-[99999] bg-[#1E1D1A]/95 border-2 border-[#CC6543] rounded-2xl p-3 shadow-2xl backdrop-blur-md animate-slide-down sm:hidden">
+          <div className="flex items-center justify-between text-xs text-[#DE7C5A] font-bold pb-2 border-b border-[#383530]">
+            <span className="flex items-center gap-1.5 truncate">
+              <FolderPlus className="w-3.5 h-3.5 text-[#CC6543] animate-bounce shrink-0" />
+              <span className="truncate">Drop "{draggingExercise}" onto:</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setDraggingExercise(null);
+                setDragOverProfile(null);
+                setTouchPosition(null);
+              }}
+              className="text-[#A8A297] hover:text-white p-1 ml-2 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto py-2 no-scrollbar">
+            {/* Target: General (None) */}
+            <div
+              data-profile-drop="__none__"
+              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold shrink-0 transition-all ${
+                dragOverProfile === '__none__'
+                  ? 'bg-[#CC6543] text-white border-white scale-105 shadow-md shadow-[#CC6543]/40'
+                  : 'bg-[#252320] border-[#383530] text-[#A8A297]'
+              }`}
+            >
+              General (None)
+            </div>
+
+            {/* Profile Folders */}
+            {profiles.map((p) => (
+              <div
+                key={p}
+                data-profile-drop={p}
+                className={`px-3.5 py-1.5 rounded-xl border text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 ${
+                  dragOverProfile === p
+                    ? 'bg-[#CC6543] text-white border-white scale-105 shadow-md shadow-[#CC6543]/40'
+                    : 'bg-[#252320] border-[#383530] text-[#F5F2EB]'
+                }`}
+              >
+                <Folder className="w-3.5 h-3.5 text-[#CC6543]" />
+                <span>{p}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Tap-to-Move Native Bottom Sheet Modal */}
+      {mobileMoveExercise && (
+        <div
+          onClick={() => setMobileMoveExercise(null)}
+          className="fixed inset-0 z-[999999] bg-black/70 backdrop-blur-sm flex items-end sm:hidden animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full bg-[#1E1D1A] border-t border-[#CC6543]/40 rounded-t-3xl p-5 space-y-4 max-h-[80vh] overflow-y-auto animate-slide-up shadow-2xl"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[#383530]">
+              <div className="min-w-0 flex-1 mr-2">
+                <span className="text-[10px] uppercase font-bold text-[#CC6543] tracking-widest block">
+                  Move Exercise
+                </span>
+                <h3 className="text-lg font-bold text-white truncate">
+                  {mobileMoveExercise}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileMoveExercise(null)}
+                className="p-1.5 rounded-full text-[#A8A297] hover:text-white bg-[#252320]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-xs text-[#A8A297] font-medium block pb-1">
+                Select target profile folder:
+              </span>
+
+              {/* Option: General (None) */}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (onBulkUpdateExerciseProfile) {
+                    await onBulkUpdateExerciseProfile([mobileMoveExercise], null);
+                    setDragFeedbackMessage(`Moved "${mobileMoveExercise}" to General Exercises`);
+                    setTimeout(() => setDragFeedbackMessage(null), 3000);
+                  }
+                  setMobileMoveExercise(null);
+                }}
+                className="w-full p-3 rounded-xl bg-[#252320] border border-[#383530] hover:border-[#CC6543] text-left text-sm text-[#F5F2EB] flex items-center justify-between active:scale-98 transition"
+              >
+                <span>General (No Profile)</span>
+                <ArrowRight className="w-4 h-4 text-[#A8A297]" />
+              </button>
+
+              {/* Profiles */}
+              {profiles.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={async () => {
+                    if (onBulkUpdateExerciseProfile) {
+                      await onBulkUpdateExerciseProfile([mobileMoveExercise], p);
+                      setDragFeedbackMessage(`Moved "${mobileMoveExercise}" into "${p}"`);
+                      setTimeout(() => setDragFeedbackMessage(null), 3000);
+                    }
+                    setMobileMoveExercise(null);
+                  }}
+                  className="w-full p-3 rounded-xl bg-[#252320] border border-[#383530] hover:border-[#CC6543] text-left text-sm font-bold text-white flex items-center justify-between active:scale-98 transition"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Folder className="w-4 h-4 text-[#CC6543]" />
+                    <span>{p}</span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-[#CC6543]" />
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
