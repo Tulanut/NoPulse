@@ -64,9 +64,21 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   const [editingProfile, setEditingProfile] = useState<string | null>(null);
   const [editProfileName, setEditProfileName] = useState('');
 
+  // Custom Exercise Sort Order State
+  const [customOrder, setCustomOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('nopulse_exercise_custom_order');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   // Drag and Drop State (Desktop & Mobile Touch)
   const [draggingExercise, setDraggingExercise] = useState<string | null>(null);
   const [dragOverProfile, setDragOverProfile] = useState<string | null>(null);
+  const [dragOverExercise, setDragOverExercise] = useState<string | null>(null);
+  const [dragOverPosition, setDragOverPosition] = useState<'above' | 'below'>('below');
   const [touchPosition, setTouchPosition] = useState<{ x: number; y: number } | null>(null);
   const [dragFeedbackMessage, setDragFeedbackMessage] = useState<string | null>(null);
 
@@ -107,8 +119,23 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     if (dropZone) {
       const targetProfile = dropZone.getAttribute('data-profile-drop');
       setDragOverProfile(targetProfile);
+      setDragOverExercise(null);
     } else {
       setDragOverProfile(null);
+      const exerciseDropZone = elem?.closest('[data-exercise-drop]');
+      if (exerciseDropZone) {
+        const targetName = exerciseDropZone.getAttribute('data-exercise-drop');
+        if (targetName && targetName !== draggingExercise) {
+          const rect = exerciseDropZone.getBoundingClientRect();
+          const pos = touch.clientY < rect.top + rect.height / 2 ? 'above' : 'below';
+          setDragOverExercise(targetName);
+          setDragOverPosition(pos);
+        } else {
+          setDragOverExercise(null);
+        }
+      } else {
+        setDragOverExercise(null);
+      }
     }
   };
 
@@ -130,9 +157,12 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         target ? `Moved "${draggingExercise}" into "${target}"` : `Moved "${draggingExercise}" to General Exercises`
       );
       setTimeout(() => setDragFeedbackMessage(null), 3000);
+    } else if (dragOverExercise && dragOverExercise !== draggingExercise) {
+      reorderExercises(draggingExercise, dragOverExercise, dragOverPosition);
     }
     setDraggingExercise(null);
     setDragOverProfile(null);
+    setDragOverExercise(null);
     setTouchPosition(null);
   };
 
@@ -234,15 +264,32 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     return workouts.filter((w) => w.profile === activeProfile);
   }, [workouts, activeProfile]);
 
+  // Sort helper using customOrder if available
+  const sortWithCustomOrder = (items: ExerciseSummary[]): ExerciseSummary[] => {
+    if (customOrder.length === 0) {
+      return items;
+    }
+    return [...items].sort((a, b) => {
+      const indexA = customOrder.indexOf(a.name);
+      const indexB = customOrder.indexOf(b.name);
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      return b.totalLogs - a.totalLogs;
+    });
+  };
+
   // Summaries for current view
   const currentSummaries = useMemo(() => {
     if (activeProfile) {
-      return groupExercises(activeProfileWorkouts);
+      return sortWithCustomOrder(groupExercises(activeProfileWorkouts));
     }
     // On the main page, show direct/uncategorized exercises (or all if no profiles exist)
     const list = profileCards.length > 0 ? uncategorizedWorkouts : workouts;
-    return groupExercises(list);
-  }, [activeProfile, activeProfileWorkouts, profileCards.length, uncategorizedWorkouts, workouts]);
+    return sortWithCustomOrder(groupExercises(list));
+  }, [activeProfile, activeProfileWorkouts, profileCards.length, uncategorizedWorkouts, workouts, customOrder]);
 
   const filteredSummaries = useMemo(() => {
     if (!searchQuery.trim()) return currentSummaries;
@@ -250,6 +297,45 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
       e.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [currentSummaries, searchQuery]);
+
+  // Reorder exercises by drag & drop
+  const reorderExercises = (sourceName: string, targetName: string, position: 'above' | 'below') => {
+    if (!sourceName || !targetName || sourceName === targetName) return;
+
+    // Take current ordered names
+    const currentNames = currentSummaries.map((s) => s.name);
+    const fullOrder = Array.from(new Set([...customOrder, ...currentNames]));
+
+    const fromIdx = fullOrder.indexOf(sourceName);
+    if (fromIdx === -1) return;
+    fullOrder.splice(fromIdx, 1);
+
+    const toIdx = fullOrder.indexOf(targetName);
+    if (toIdx === -1) {
+      fullOrder.push(sourceName);
+    } else {
+      const insertIdx = position === 'above' ? toIdx : toIdx + 1;
+      fullOrder.splice(insertIdx, 0, sourceName);
+    }
+
+    setCustomOrder(fullOrder);
+    try {
+      localStorage.setItem('nopulse_exercise_custom_order', JSON.stringify(fullOrder));
+    } catch (err) {
+      console.error('Failed to save exercise order:', err);
+    }
+
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(25);
+      } catch {
+        // ignore
+      }
+    }
+
+    setDragFeedbackMessage(`Reordered "${sourceName}"`);
+    setTimeout(() => setDragFeedbackMessage(null), 2000);
+  };
 
   // Bulk selection helpers
   const toggleSelectExercise = (name: string) => {
@@ -382,19 +468,51 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     return (
       <div
         key={item.name}
+        data-exercise-drop={item.name}
         draggable={!isSelecting}
         onDragStart={(e) => {
           e.dataTransfer.setData('text/plain', item.name);
           e.dataTransfer.effectAllowed = 'move';
           setDraggingExercise(item.name);
         }}
+        onDragOver={(e) => {
+          if (!draggingExercise || draggingExercise === item.name) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          const rect = e.currentTarget.getBoundingClientRect();
+          const pos = e.clientY < rect.top + rect.height / 2 ? 'above' : 'below';
+          setDragOverExercise(item.name);
+          setDragOverPosition(pos);
+          setDragOverProfile(null);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          if (dragOverExercise === item.name) {
+            setDragOverExercise(null);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const src = e.dataTransfer.getData('text/plain') || draggingExercise;
+          if (src && src !== item.name) {
+            reorderExercises(src, item.name, dragOverPosition);
+          }
+          setDraggingExercise(null);
+          setDragOverExercise(null);
+          setDragOverProfile(null);
+        }}
         onDragEnd={() => {
           setDraggingExercise(null);
           setDragOverProfile(null);
+          setDragOverExercise(null);
         }}
-        className={`py-5 flex items-center justify-between gap-3 transition-all duration-200 group rounded-xl px-2.5 -mx-2.5 ${
+        className={`relative py-5 flex items-center justify-between gap-3 transition-all duration-150 group rounded-xl px-2.5 -mx-2.5 ${
           isBeingDragged
             ? 'opacity-35 scale-[0.98] border border-dashed border-[#CC6543] bg-[#CC6543]/5'
+            : dragOverExercise === item.name
+            ? dragOverPosition === 'above'
+              ? 'border-t-2 border-t-[#CC6543] bg-[#CC6543]/10 -translate-y-0.5'
+              : 'border-b-2 border-b-[#CC6543] bg-[#CC6543]/10 translate-y-0.5'
             : isSelecting
             ? isChecked
               ? 'bg-[#CC6543]/10 border border-[#CC6543]/40'
@@ -402,6 +520,18 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
             : 'hover:translate-x-1'
         }`}
       >
+        {/* Visual Drop Placement Marker */}
+        {dragOverExercise === item.name && (
+          <div
+            className={`absolute left-0 right-0 h-0.5 bg-[#CC6543] z-20 pointer-events-none flex items-center justify-center ${
+              dragOverPosition === 'above' ? '-top-0.5' : '-bottom-0.5'
+            }`}
+          >
+            <span className="text-[9px] uppercase tracking-wider font-bold bg-[#CC6543] text-white px-2 py-0.5 rounded-full shadow-md">
+              Insert here
+            </span>
+          </div>
+        )}
         {/* Grip Handle for Drag & Drop (Desktop + Mobile Touch) */}
         {!isSelecting && (
           <div
