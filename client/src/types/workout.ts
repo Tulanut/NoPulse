@@ -8,6 +8,7 @@ export interface Workout {
   rir: number; // Reps in reserve (0 = failure, 1 = 1 rep in tank, etc.)
   weight?: number | null; // Load lifted in kg or lbs
   profile?: string | null; // Optional user workout profile (e.g. "Armwrestling", "Rehab")
+  sub_profile?: string | null; // Optional sub-section/sub-folder within profile (e.g. "Not Enough Sleep Day")
   date: string; // YYYY-MM-DD
   notes?: string | null;
   created_at: string;

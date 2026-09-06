@@ -6,6 +6,7 @@ export interface Workout {
   rir: number;
   weight?: number | null;
   profile?: string | null;
+  sub_profile?: string | null;
   date: string;
   notes?: string | null;
   created_at: string;

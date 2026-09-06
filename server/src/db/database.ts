@@ -28,6 +28,7 @@ export class Database {
           rir REAL NOT NULL,
           weight REAL,
           profile TEXT,
+          sub_profile TEXT,
           date TEXT NOT NULL,
           notes TEXT,
           created_at TEXT NOT NULL,
@@ -45,20 +46,23 @@ export class Database {
         // Run auto-migrations for existing tables
         this.db.run(`ALTER TABLE workouts ADD COLUMN weight REAL`, () => {
           this.db.run(`ALTER TABLE workouts ADD COLUMN profile TEXT`, () => {
-            // Create indexes after columns are guaranteed to exist
-            const indexSql = `
-              CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
-              CREATE INDEX IF NOT EXISTS idx_workouts_exercise ON workouts(exercise_name);
-              CREATE INDEX IF NOT EXISTS idx_workouts_profile ON workouts(profile);
-              CREATE INDEX IF NOT EXISTS idx_workouts_updated_at ON workouts(updated_at);
-            `;
+            this.db.run(`ALTER TABLE workouts ADD COLUMN sub_profile TEXT`, () => {
+              // Create indexes after columns are guaranteed to exist
+              const indexSql = `
+                CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
+                CREATE INDEX IF NOT EXISTS idx_workouts_exercise ON workouts(exercise_name);
+                CREATE INDEX IF NOT EXISTS idx_workouts_profile ON workouts(profile);
+                CREATE INDEX IF NOT EXISTS idx_workouts_sub_profile ON workouts(sub_profile);
+                CREATE INDEX IF NOT EXISTS idx_workouts_updated_at ON workouts(updated_at);
+              `;
 
-            this.db.exec(indexSql, (indexErr) => {
-              if (indexErr) {
-                console.error('Failed to create indexes:', indexErr);
-                return reject(indexErr);
-              }
-              resolve();
+              this.db.exec(indexSql, (indexErr) => {
+                if (indexErr) {
+                  console.error('Failed to create indexes:', indexErr);
+                  return reject(indexErr);
+                }
+                resolve();
+              });
             });
           });
         });
@@ -114,7 +118,7 @@ export class Database {
       if (incomingUpdated >= existingUpdated) {
         await this.run(
           `UPDATE workouts 
-           SET exercise_name = ?, sets = ?, reps = ?, rir = ?, weight = ?, profile = ?, date = ?, notes = ?, created_at = ?, updated_at = ?, is_deleted = ?
+           SET exercise_name = ?, sets = ?, reps = ?, rir = ?, weight = ?, profile = ?, sub_profile = ?, date = ?, notes = ?, created_at = ?, updated_at = ?, is_deleted = ?
            WHERE id = ?`,
           [
             w.exercise_name,
@@ -123,6 +127,7 @@ export class Database {
             w.rir,
             w.weight ?? null,
             w.profile ?? null,
+            w.sub_profile ?? null,
             w.date,
             w.notes || null,
             w.created_at,
@@ -134,8 +139,8 @@ export class Database {
       }
     } else {
       await this.run(
-        `INSERT INTO workouts (id, exercise_name, sets, reps, rir, weight, profile, date, notes, created_at, updated_at, is_deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO workouts (id, exercise_name, sets, reps, rir, weight, profile, sub_profile, date, notes, created_at, updated_at, is_deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           w.id,
           w.exercise_name,
@@ -144,6 +149,7 @@ export class Database {
           w.rir,
           w.weight ?? null,
           w.profile ?? null,
+          w.sub_profile ?? null,
           w.date,
           w.notes || null,
           w.created_at,

@@ -20,11 +20,18 @@ import { formatSpelledDate } from '../utils/dateUtils';
 interface ExerciseHubProps {
   workouts: Workout[];
   profiles: string[];
+  subProfiles?: Record<string, string[]>;
   onCreateProfile: (name: string) => Promise<string>;
   onDeleteProfile?: (profileName: string) => Promise<void> | void;
   onRenameProfile?: (oldName: string, newName: string) => Promise<boolean | void> | void;
+  onCreateSubProfile?: (profileName: string, subProfileName: string) => Promise<string>;
+  onRenameSubProfile?: (profileName: string, oldName: string, newName: string) => Promise<boolean | void> | void;
+  onDeleteSubProfile?: (profileName: string, subProfileName: string) => Promise<void>;
   onDeleteExercise?: (exerciseName: string, profile?: string) => Promise<void> | void;
+  onUpdateExerciseProfile?: (exerciseName: string, newProfile: string | null) => Promise<void> | void;
+  onUpdateExerciseSubProfile?: (exerciseName: string, profileName: string, subProfile: string | null) => Promise<void>;
   onBulkUpdateExerciseProfile?: (exerciseNames: string[], newProfile: string | null) => Promise<void> | void;
+  onBulkUpdateExerciseSubProfile?: (exerciseNames: string[], profileName: string, subProfile: string | null) => Promise<void>;
   onBulkDeleteExercises?: (exerciseNames: string[]) => Promise<void> | void;
   onSelectExercise: (exerciseName: string) => void;
   onGoToLog: () => void;
@@ -41,16 +48,23 @@ interface ExerciseSummary {
   lastTrainedDate: string | null;
   latestRir: number | null;
   profiles: string[];
+  subProfile?: string | null;
 }
 
 export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   workouts,
   profiles,
+  subProfiles = {},
   onCreateProfile,
   onDeleteProfile,
   onRenameProfile,
+  onCreateSubProfile,
+  onRenameSubProfile,
+  onDeleteSubProfile,
   onDeleteExercise,
+  onUpdateExerciseSubProfile,
   onBulkUpdateExerciseProfile,
+  onBulkUpdateExerciseSubProfile,
   onBulkDeleteExercises,
   onSelectExercise,
   onGoToLog,
@@ -59,6 +73,19 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [deleteConfirmProfile, setDeleteConfirmProfile] = useState<string | null>(null);
   const [deleteConfirmExercise, setDeleteConfirmExercise] = useState<string | null>(null);
+
+  // Sub-profile State (Inside Active Profile)
+  const [activeSubProfile, setActiveSubProfile] = useState<string | null>(null);
+  const [isCreatingSubProfile, setIsCreatingSubProfile] = useState(false);
+  const [newSubProfileName, setNewSubProfileName] = useState('');
+  const [editingSubProfile, setEditingSubProfile] = useState<string | null>(null);
+  const [editSubProfileName, setEditSubProfileName] = useState('');
+  const [deleteConfirmSubProfile, setDeleteConfirmSubProfile] = useState<string | null>(null);
+  const [dragOverSubProfile, setDragOverSubProfile] = useState<string | null>(null);
+  const [mobileSubProfileExercise, setMobileSubProfileExercise] = useState<string | null>(null);
+  const [showSubProfilePicker, setShowSubProfilePicker] = useState(false);
+  const [isCreatingBulkSubProfile, setIsCreatingBulkSubProfile] = useState(false);
+  const [bulkNewSubProfileName, setBulkNewSubProfileName] = useState('');
 
   // Profile Inline Rename State
   const [editingProfile, setEditingProfile] = useState<string | null>(null);
@@ -115,6 +142,20 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     }
 
     const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    // 1. Check if hovering over a sub-profile drop zone (inside activeProfile)
+    const subDropZone = elem?.closest('[data-subprofile-drop]');
+    if (subDropZone && activeProfile) {
+      const targetSub = subDropZone.getAttribute('data-subprofile-drop');
+      setDragOverSubProfile(targetSub);
+      setDragOverProfile(null);
+      setDragOverExercise(null);
+      return;
+    } else {
+      setDragOverSubProfile(null);
+    }
+
+    // 2. Check if hovering over a profile drop zone
     const dropZone = elem?.closest('[data-profile-drop]');
     if (dropZone) {
       const targetProfile = dropZone.getAttribute('data-profile-drop');
@@ -141,7 +182,29 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
 
   const handleTouchEnd = async () => {
     if (!draggingExercise) return;
-    if (dragOverProfile && onBulkUpdateExerciseProfile) {
+
+    // 1. If dropping into a sub-profile
+    if (activeProfile && dragOverSubProfile && onUpdateExerciseSubProfile) {
+      const targetSub = dragOverSubProfile === '__none__' ? null : dragOverSubProfile;
+      await onUpdateExerciseSubProfile(draggingExercise, activeProfile, targetSub);
+
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate([15, 35, 15]);
+        } catch {
+          // ignore
+        }
+      }
+
+      setDragFeedbackMessage(
+        targetSub
+          ? `Moved "${draggingExercise}" into sub-folder "${targetSub}"`
+          : `Removed "${draggingExercise}" from sub-folder`
+      );
+      setTimeout(() => setDragFeedbackMessage(null), 3000);
+    }
+    // 2. If dropping into a profile
+    else if (dragOverProfile && onBulkUpdateExerciseProfile) {
       const target = dragOverProfile === '__none__' ? null : dragOverProfile;
       await onBulkUpdateExerciseProfile([draggingExercise], target);
 
@@ -157,11 +220,15 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         target ? `Moved "${draggingExercise}" into "${target}"` : `Moved "${draggingExercise}" to General Exercises`
       );
       setTimeout(() => setDragFeedbackMessage(null), 3000);
-    } else if (dragOverExercise && dragOverExercise !== draggingExercise) {
+    }
+    // 3. If reordering between exercises
+    else if (dragOverExercise && dragOverExercise !== draggingExercise) {
       reorderExercises(draggingExercise, dragOverExercise, dragOverPosition);
     }
+
     setDraggingExercise(null);
     setDragOverProfile(null);
+    setDragOverSubProfile(null);
     setDragOverExercise(null);
     setTouchPosition(null);
   };
@@ -207,6 +274,17 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         new Set(items.map((i) => i.profile).filter((p): p is string => Boolean(p)))
       );
 
+      // Determine sub-profile: if in activeProfile, pick matching entry; otherwise first found
+      let itemSubProfile: string | null = null;
+      if (activeProfile) {
+        const matching = items.find(
+          (i) => i.profile?.toLowerCase() === activeProfile.toLowerCase() && i.sub_profile
+        );
+        itemSubProfile = matching?.sub_profile || null;
+      } else {
+        itemSubProfile = items.find((i) => i.sub_profile)?.sub_profile || null;
+      }
+
       summaries.push({
         name,
         totalLogs,
@@ -217,6 +295,7 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         lastTrainedDate,
         latestRir,
         profiles: exProfiles,
+        subProfile: itemSubProfile,
       });
     });
 
@@ -291,12 +370,54 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     return sortWithCustomOrder(groupExercises(list));
   }, [activeProfile, activeProfileWorkouts, profileCards.length, uncategorizedWorkouts, workouts, customOrder]);
 
+  // Sub-profiles list for the currently active profile
+  const currentSubProfiles = useMemo(() => {
+    if (!activeProfile || !subProfiles) return [];
+    return subProfiles[activeProfile] || [];
+  }, [activeProfile, subProfiles]);
+
+  // Exercise counts per sub-profile inside the active profile
+  const subProfileCounts = useMemo(() => {
+    if (!activeProfile) return { all: 0, general: 0 };
+    const counts: Record<string, number> = {
+      all: currentSummaries.length,
+      general: 0,
+    };
+    currentSubProfiles.forEach((s) => {
+      counts[s] = 0;
+    });
+
+    currentSummaries.forEach((ex) => {
+      if (ex.subProfile && counts[ex.subProfile] !== undefined) {
+        counts[ex.subProfile]++;
+      } else {
+        counts.general++;
+      }
+    });
+
+    return counts;
+  }, [activeProfile, currentSubProfiles, currentSummaries]);
+
+  // Filtered summaries with search and active sub-profile filtering
   const filteredSummaries = useMemo(() => {
-    if (!searchQuery.trim()) return currentSummaries;
-    return currentSummaries.filter((e) =>
+    let list = currentSummaries;
+
+    // Filter by activeSubProfile if inside activeProfile
+    if (activeProfile && activeSubProfile) {
+      if (activeSubProfile === '__general__') {
+        list = list.filter((e) => !e.subProfile);
+      } else {
+        list = list.filter(
+          (e) => e.subProfile?.toLowerCase() === activeSubProfile.toLowerCase()
+        );
+      }
+    }
+
+    if (!searchQuery.trim()) return list;
+    return list.filter((e) =>
       e.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [currentSummaries, searchQuery]);
+  }, [currentSummaries, activeProfile, activeSubProfile, searchQuery]);
 
   // Reorder exercises by drag & drop
   const reorderExercises = (sourceName: string, targetName: string, position: 'above' | 'below') => {
@@ -391,6 +512,100 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
     const names = Array.from(selectedExercises);
     await onBulkDeleteExercises(names);
     exitSelectionMode();
+  };
+
+  // Bulk Move to Sub-Profile (within activeProfile)
+  const handleBulkMoveToSubProfile = async (targetSubProfile: string | null) => {
+    if (!activeProfile || selectedExercises.size === 0 || !onBulkUpdateExerciseSubProfile) return;
+    const names = Array.from(selectedExercises);
+    await onBulkUpdateExerciseSubProfile(names, activeProfile, targetSubProfile);
+    setShowSubProfilePicker(false);
+    exitSelectionMode();
+  };
+
+  const handleBulkCreateSubProfileAndMove = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      !activeProfile ||
+      !bulkNewSubProfileName.trim() ||
+      selectedExercises.size === 0 ||
+      !onBulkUpdateExerciseSubProfile ||
+      !onCreateSubProfile
+    )
+      return;
+
+    const created = await onCreateSubProfile(activeProfile, bulkNewSubProfileName.trim());
+    const names = Array.from(selectedExercises);
+    await onBulkUpdateExerciseSubProfile(names, activeProfile, created);
+    setBulkNewSubProfileName('');
+    setIsCreatingBulkSubProfile(false);
+    setShowSubProfilePicker(false);
+    exitSelectionMode();
+  };
+
+  // Sub-profile creation inside activeProfile
+  const handleCreateSubProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeProfile || !newSubProfileName.trim() || !onCreateSubProfile) return;
+    const name = newSubProfileName.trim();
+    await onCreateSubProfile(activeProfile, name);
+    setNewSubProfileName('');
+    setIsCreatingSubProfile(false);
+    setActiveSubProfile(name);
+  };
+
+  // Sub-profile rename handlers
+  const handleStartRenameSubProfile = (e: React.MouseEvent, subName: string) => {
+    e.stopPropagation();
+    setEditingSubProfile(subName);
+    setEditSubProfileName(subName);
+    setDeleteConfirmSubProfile(null);
+  };
+
+  const handleCancelRenameSubProfile = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingSubProfile(null);
+    setEditSubProfileName('');
+  };
+
+  const handleSaveRenameSubProfile = async (e?: React.FormEvent | React.MouseEvent, oldName?: string) => {
+    if (e) e.preventDefault();
+    if (e && 'stopPropagation' in e) e.stopPropagation();
+
+    const targetOld = oldName || editingSubProfile;
+    if (!activeProfile || !targetOld) return;
+
+    const trimmed = editSubProfileName.trim();
+    if (!trimmed || trimmed.toLowerCase() === targetOld.toLowerCase()) {
+      handleCancelRenameSubProfile();
+      return;
+    }
+
+    if (onRenameSubProfile) {
+      await onRenameSubProfile(activeProfile, targetOld, trimmed);
+      if (activeSubProfile === targetOld) {
+        setActiveSubProfile(trimmed);
+      }
+    }
+
+    handleCancelRenameSubProfile();
+  };
+
+  // Sub-profile delete handlers
+  const handleDeleteSubProfileClick = (e: React.MouseEvent, subName: string) => {
+    e.stopPropagation();
+    setDeleteConfirmSubProfile(subName);
+  };
+
+  const handleConfirmDeleteSubProfile = async (e: React.MouseEvent, subName: string) => {
+    e.stopPropagation();
+    if (activeProfile && onDeleteSubProfile) {
+      await onDeleteSubProfile(activeProfile, subName);
+      if (activeSubProfile === subName) {
+        setActiveSubProfile(null);
+      }
+    }
+    setDeleteConfirmSubProfile(null);
   };
 
   // Single item delete click handlers
@@ -570,9 +785,17 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
           }}
           className="space-y-1.5 flex-1 text-left"
         >
-          <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F2EB] group-hover:text-claude-terracottaLight transition-colors">
-            {item.name}
-          </h3>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F2EB] group-hover:text-claude-terracottaLight transition-colors">
+              {item.name}
+            </h3>
+            {activeProfile && item.subProfile && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#CC6543]/15 text-[#DE7C5A] border border-[#CC6543]/30 shrink-0">
+                <Folder className="w-3 h-3 text-[#CC6543]" />
+                <span>{item.subProfile}</span>
+              </span>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#A8A297]">
             <span>
@@ -602,19 +825,35 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         {/* Normal Actions (hidden during selection) */}
         {!isSelecting && (
           <div className="flex items-center gap-2 shrink-0">
-            {/* Quick Move to Profile Button for Mobile */}
-            {onBulkUpdateExerciseProfile && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMobileMoveExercise(item.name);
-                }}
-                className="sm:hidden p-2 rounded-full text-[#706B62] hover:text-[#CC6543] hover:bg-[#CC6543]/10 transition-colors"
-                title={`Move ${item.name} to a profile`}
-              >
-                <FolderPlus className="w-4 h-4 text-[#CC6543]" />
-              </button>
+            {/* Quick Move Button for Mobile & Desktop */}
+            {activeProfile ? (
+              onUpdateExerciseSubProfile && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMobileSubProfileExercise(item.name);
+                  }}
+                  className="p-2 rounded-full text-[#706B62] hover:text-[#CC6543] hover:bg-[#CC6543]/10 transition-colors"
+                  title={`Move "${item.name}" to sub-folder`}
+                >
+                  <FolderPlus className="w-4 h-4 text-[#CC6543]" />
+                </button>
+              )
+            ) : (
+              onBulkUpdateExerciseProfile && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMobileMoveExercise(item.name);
+                  }}
+                  className="sm:hidden p-2 rounded-full text-[#706B62] hover:text-[#CC6543] hover:bg-[#CC6543]/10 transition-colors"
+                  title={`Move ${item.name} to a profile`}
+                >
+                  <FolderPlus className="w-4 h-4 text-[#CC6543]" />
+                </button>
+              )
             )}
 
             {onDeleteExercise && (
@@ -690,14 +929,102 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* 1. Add / Move to Profile */}
+            {/* If inside activeProfile, provide Move to Sub-Folder */}
+            {activeProfile && onBulkUpdateExerciseSubProfile && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowSubProfilePicker(!showSubProfilePicker)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#252320] border border-[#383530] hover:border-[#CC6543] text-xs font-semibold text-[#F5F2EB] hover:text-white transition"
+                >
+                  <FolderPlus className="w-3.5 h-3.5 text-[#CC6543]" />
+                  <span>Move to Sub-Folder</span>
+                </button>
+
+                {/* Sub-Profile Picker Dropdown */}
+                {showSubProfilePicker && (
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-[#252320] border border-[#383530] rounded-xl shadow-2xl p-3 space-y-2 z-50 animate-pop-in">
+                    <span className="text-[10px] uppercase font-bold text-[#A8A297] tracking-wider block pb-1 border-b border-[#383530]">
+                      Select Sub-Folder in {activeProfile}
+                    </span>
+
+                    {/* General (No Sub-Folder) */}
+                    <button
+                      type="button"
+                      onClick={() => handleBulkMoveToSubProfile(null)}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#383530] text-xs text-[#F5F2EB] transition flex items-center justify-between"
+                    >
+                      <span>General (No Sub-Folder)</span>
+                    </button>
+
+                    {/* Existing Sub-Profiles */}
+                    {currentSubProfiles.map((sub) => (
+                      <button
+                        key={sub}
+                        type="button"
+                        onClick={() => handleBulkMoveToSubProfile(sub)}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#CC6543]/20 hover:text-white text-xs text-[#F5F2EB] transition flex items-center justify-between"
+                      >
+                        <span>{sub}</span>
+                      </button>
+                    ))}
+
+                    {/* Create New Sub-Folder Inline */}
+                    <div className="pt-2 border-t border-[#383530]">
+                      {!isCreatingBulkSubProfile ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsCreatingBulkSubProfile(true)}
+                          className="w-full text-left px-2 py-1 text-xs text-[#CC6543] hover:underline flex items-center gap-1 font-semibold"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Create New Sub-Folder...</span>
+                        </button>
+                      ) : (
+                        <form onSubmit={handleBulkCreateSubProfileAndMove} className="space-y-2">
+                          <input
+                            type="text"
+                            placeholder="New sub-folder name..."
+                            value={bulkNewSubProfileName}
+                            onChange={(e) => setBulkNewSubProfileName(e.target.value)}
+                            autoFocus
+                            className="w-full bg-[#191816] border border-[#CC6543] rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none"
+                          />
+                          <div className="flex gap-1.5">
+                            <button
+                              type="submit"
+                              disabled={!bulkNewSubProfileName.trim()}
+                              className="flex-1 bg-[#CC6543] hover:bg-[#DE7C5A] text-white py-1 rounded text-[11px] font-bold disabled:opacity-40"
+                            >
+                              Create & Move
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsCreatingBulkSubProfile(false);
+                                setBulkNewSubProfileName('');
+                              }}
+                              className="px-2 py-1 text-[11px] text-[#A8A297]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Move to Profile */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowProfilePicker(!showProfilePicker)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#252320] border border-[#383530] hover:border-[#CC6543] text-xs font-semibold text-[#F5F2EB] hover:text-white transition"
               >
-                <FolderPlus className="w-3.5 h-3.5 text-[#CC6543]" />
+                <Folder className="w-3.5 h-3.5 text-[#CC6543]" />
                 <span>Move to Profile</span>
               </button>
 
@@ -993,6 +1320,373 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
           </div>
         </div>
 
+        {/* =========================================================================
+            SUB-FOLDERS / SECTIONS GROUPING SYSTEM (Within this Workout Profile)
+           ========================================================================= */}
+        <div className="mb-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-wider text-[#A8A297] font-bold">
+                Sub-Folders & Sections
+              </span>
+              {currentSubProfiles.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-[#252320] border border-[#383530] text-[10px] font-semibold text-[#CC6543]">
+                  {currentSubProfiles.length}
+                </span>
+              )}
+            </div>
+
+            {/* Quick Button to Create New Sub-Folder */}
+            {!isCreatingSubProfile && onCreateSubProfile && (
+              <button
+                type="button"
+                onClick={() => setIsCreatingSubProfile(true)}
+                className="inline-flex items-center gap-1 text-xs text-[#CC6543] hover:text-[#DE7C5A] font-semibold hover:underline"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Sub-Folder</span>
+              </button>
+            )}
+          </div>
+
+          {/* Inline Create Form if isCreatingSubProfile */}
+          {isCreatingSubProfile && (
+            <form
+              onSubmit={handleCreateSubProfile}
+              className="p-3 bg-[#252320]/80 border border-[#CC6543]/60 rounded-2xl flex items-center gap-2 animate-pop-in shadow-lg"
+            >
+              <Folder className="w-4 h-4 text-[#CC6543] shrink-0" />
+              <input
+                type="text"
+                placeholder="e.g. Not Enough Sleep Day, Enough Sleep Day, Heavy Day..."
+                value={newSubProfileName}
+                onChange={(e) => setNewSubProfileName(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setIsCreatingSubProfile(false);
+                    setNewSubProfileName('');
+                  }
+                }}
+                className="bg-transparent border-none focus:outline-none text-sm text-[#F5F2EB] placeholder-[#706B62] flex-1"
+              />
+              <button
+                type="submit"
+                disabled={!newSubProfileName.trim()}
+                className="px-3 py-1 rounded-xl bg-[#CC6543] hover:bg-[#DE7C5A] disabled:opacity-40 text-white text-xs font-bold transition flex items-center gap-1"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Create</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingSubProfile(false);
+                  setNewSubProfileName('');
+                }}
+                className="p-1 text-[#A8A297] hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </form>
+          )}
+
+          {/* Active Drag Instructions Banner inside Profile */}
+          {draggingExercise && (
+            <div className="p-3.5 rounded-xl bg-[#CC6543]/15 border border-[#CC6543]/40 text-[#DE7C5A] flex items-center justify-between text-xs animate-slide-up shadow-lg">
+              <div className="flex items-center gap-2 font-medium">
+                <FolderPlus className="w-4 h-4 text-[#CC6543] animate-bounce shrink-0" />
+                <span>
+                  Drop <strong>"{draggingExercise}"</strong> onto any sub-folder chip below, or into General.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraggingExercise(null);
+                  setDragOverSubProfile(null);
+                  setTouchPosition(null);
+                }}
+                className="text-xs text-[#A8A297] hover:text-white underline ml-2 shrink-0"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {/* Drop Target to remove from Sub-Folder (Make General inside this Profile) */}
+          {draggingExercise && (
+            <div
+              data-subprofile-drop="__none__"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOverSubProfile !== '__none__') setDragOverSubProfile('__none__');
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                if (dragOverSubProfile === '__none__') setDragOverSubProfile(null);
+              }}
+              onDrop={async (e) => {
+                e.preventDefault();
+                const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
+                if (exerciseName && onUpdateExerciseSubProfile && activeProfile) {
+                  await onUpdateExerciseSubProfile(exerciseName, activeProfile, null);
+                  setDragFeedbackMessage(`Removed "${exerciseName}" from sub-folder`);
+                  setTimeout(() => setDragFeedbackMessage(null), 3000);
+                }
+                setDraggingExercise(null);
+                setDragOverSubProfile(null);
+              }}
+              className={`p-3 rounded-xl border-2 border-dashed text-center text-xs font-semibold transition-all ${
+                dragOverSubProfile === '__none__'
+                  ? 'bg-[#CC6543]/25 border-[#CC6543] text-white scale-[1.01] ring-2 ring-[#CC6543]/50 shadow-lg'
+                  : 'border-[#383530] text-[#A8A297] hover:border-[#CC6543]/60 bg-[#191816]/60'
+              }`}
+            >
+              <span>📥 Drop here to remove from sub-folder (Keep in {activeProfile} General)</span>
+            </div>
+          )}
+
+          {/* Sub-Folders Filter Chips / Drop Targets Bar */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            {/* 1. "All" Chip */}
+            <button
+              type="button"
+              onClick={() => setActiveSubProfile(null)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1.5 ${
+                activeSubProfile === null
+                  ? 'bg-[#CC6543] text-white shadow-md shadow-[#CC6543]/20'
+                  : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white hover:border-[#4D4740]'
+              }`}
+            >
+              <span>All</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeSubProfile === null ? 'bg-white/20 text-white' : 'bg-[#191816] text-[#706B62]'
+                }`}
+              >
+                {subProfileCounts.all}
+              </span>
+            </button>
+
+            {/* 2. "General" Chip */}
+            {currentSubProfiles.length > 0 && (
+              <button
+                type="button"
+                data-subprofile-drop="__none__"
+                onClick={() => setActiveSubProfile(activeSubProfile === '__general__' ? null : '__general__')}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverSubProfile !== '__none__') setDragOverSubProfile('__none__');
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                  if (dragOverSubProfile === '__none__') setDragOverSubProfile(null);
+                }}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
+                  if (exerciseName && onUpdateExerciseSubProfile && activeProfile) {
+                    await onUpdateExerciseSubProfile(exerciseName, activeProfile, null);
+                    setDragFeedbackMessage(`Removed "${exerciseName}" from sub-folder`);
+                    setTimeout(() => setDragFeedbackMessage(null), 3000);
+                  }
+                  setDraggingExercise(null);
+                  setDragOverSubProfile(null);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1.5 ${
+                  dragOverSubProfile === '__none__'
+                    ? 'bg-[#CC6543] text-white border-2 border-white scale-105 ring-2 ring-[#CC6543]'
+                    : activeSubProfile === '__general__'
+                    ? 'bg-[#CC6543]/20 border border-[#CC6543] text-[#DE7C5A]'
+                    : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white'
+                }`}
+              >
+                <span>General</span>
+                <span className="text-[10px] px-1.5 rounded-full bg-[#191816] text-[#706B62]">
+                  {subProfileCounts.general}
+                </span>
+              </button>
+            )}
+
+            {/* 3. Each Sub-Profile Chip */}
+            {currentSubProfiles.map((sub) => {
+              const isSelected = activeSubProfile?.toLowerCase() === sub.toLowerCase();
+              const isOver = dragOverSubProfile === sub;
+              const isEditing = editingSubProfile === sub;
+              const isConfirmingDelete = deleteConfirmSubProfile === sub;
+
+              if (isEditing) {
+                return (
+                  <form
+                    key={sub}
+                    onSubmit={(e) => handleSaveRenameSubProfile(e, sub)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#252320] border border-[#CC6543] shrink-0 animate-pop-in"
+                  >
+                    <Folder className="w-3.5 h-3.5 text-[#CC6543]" />
+                    <input
+                      type="text"
+                      value={editSubProfileName}
+                      onChange={(e) => setEditSubProfileName(e.target.value)}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') handleCancelRenameSubProfile();
+                      }}
+                      className="bg-transparent border-none text-xs text-white focus:outline-none w-28 sm:w-36"
+                    />
+                    <button
+                      type="submit"
+                      className="p-1 text-[#CC6543] hover:text-white"
+                      title="Save"
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCancelRenameSubProfile()}
+                      className="p-1 text-[#A8A297] hover:text-white"
+                      title="Cancel"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </form>
+                );
+              }
+
+              return (
+                <div
+                  key={sub}
+                  data-subprofile-drop={sub}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverSubProfile !== sub) setDragOverSubProfile(sub);
+                  }}
+                  onDragLeave={(e) => {
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    if (dragOverSubProfile === sub) setDragOverSubProfile(null);
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const exerciseName = e.dataTransfer.getData('text/plain') || draggingExercise;
+                    if (exerciseName && onUpdateExerciseSubProfile && activeProfile) {
+                      await onUpdateExerciseSubProfile(exerciseName, activeProfile, sub);
+                      setDragFeedbackMessage(`Moved "${exerciseName}" into sub-folder "${sub}"`);
+                      setTimeout(() => setDragFeedbackMessage(null), 3000);
+                    }
+                    setDraggingExercise(null);
+                    setDragOverSubProfile(null);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition group/sub ${
+                    isOver
+                      ? 'bg-[#CC6543] text-white border-2 border-white scale-105 shadow-md shadow-[#CC6543]/40'
+                      : isSelected
+                      ? 'bg-[#CC6543] text-white shadow-md shadow-[#CC6543]/20'
+                      : 'bg-[#252320] border border-[#383530] text-[#F5F2EB] hover:border-[#CC6543]/60'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubProfile(isSelected ? null : sub)}
+                    className="flex items-center gap-1.5 text-left"
+                  >
+                    <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-[#CC6543]'}`} />
+                    <span className="truncate max-w-[130px] sm:max-w-[180px]">{sub}</span>
+                    <span
+                      className={`text-[10px] px-1.5 rounded-full ${
+                        isSelected ? 'bg-white/20 text-white' : 'bg-[#191816] text-[#A8A297]'
+                      }`}
+                    >
+                      {subProfileCounts[sub] || 0}
+                    </span>
+                  </button>
+
+                  {/* Actions: Inline Rename & Delete */}
+                  {!isConfirmingDelete ? (
+                    <div className="flex items-center gap-0.5 opacity-60 group-hover/sub:opacity-100 transition-opacity ml-1">
+                      {onRenameSubProfile && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleStartRenameSubProfile(e, sub)}
+                          className="p-1 text-[#A8A297] hover:text-[#DE7C5A]"
+                          title={`Rename sub-folder "${sub}"`}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+                      {onDeleteSubProfile && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteSubProfileClick(e, sub)}
+                          className="p-1 text-[#A8A297] hover:text-red-400"
+                          title={`Delete sub-folder "${sub}"`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 bg-[#D45B5B]/20 border border-[#D45B5B]/40 px-2 py-0.5 rounded-lg animate-pop-in ml-1">
+                      <span className="text-[10px] text-[#F5B5B5]">Delete?</span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleConfirmDeleteSubProfile(e, sub)}
+                        className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmSubProfile(null);
+                        }}
+                        className="text-[10px] text-[#A8A297] hover:text-white"
+                      >
+                        No
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* "+ New Sub-Folder" button at the end of the scroll row */}
+            {!isCreatingSubProfile && onCreateSubProfile && (
+              <button
+                type="button"
+                onClick={() => setIsCreatingSubProfile(true)}
+                className="px-3 py-1.5 rounded-xl border border-dashed border-[#383530] hover:border-[#CC6543] text-xs font-semibold text-[#A8A297] hover:text-[#CC6543] shrink-0 transition flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Sub-Folder</span>
+              </button>
+            )}
+          </div>
+
+          {/* Active Filter Indicator banner */}
+          {activeSubProfile && (
+            <div className="p-2.5 rounded-xl bg-[#252320]/70 border border-[#383530] flex items-center justify-between text-xs text-[#A8A297] animate-fade-in">
+              <div className="flex items-center gap-1.5">
+                <span>Filtering by:</span>
+                <span className="font-bold text-[#DE7C5A]">
+                  {activeSubProfile === '__general__' ? 'General (No Sub-Folder)' : activeSubProfile}
+                </span>
+                <span>({filteredSummaries.length} exercises)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveSubProfile(null)}
+                className="text-xs text-[#CC6543] hover:underline font-semibold"
+              >
+                Show All
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Selection Bar inside Profile */}
         {isSelecting && filteredSummaries.length > 0 && (
           <div className="mb-4 flex items-center justify-between text-xs text-[#A8A297] bg-[#252320]/60 p-2.5 rounded-xl border border-[#383530]">
@@ -1021,7 +1715,9 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
         {filteredSummaries.length === 0 ? (
           <div className="py-16 text-center animate-pop-in">
             <p className="text-base text-[#C8C2B7] italic mb-6">
-              No exercises logged under "{activeProfile}" yet.
+              {activeSubProfile
+                ? `No exercises found in "${activeSubProfile}".`
+                : `No exercises logged under "${activeProfile}" yet.`}
             </p>
             <button
               onClick={onGoToLog}
@@ -1053,6 +1749,141 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
           <div className="fixed top-6 right-6 z-[999999] px-4 py-2.5 rounded-xl bg-[#252320] border border-[#789D74] text-[#B8D4B5] text-xs font-semibold shadow-2xl flex items-center gap-2 animate-pop-in">
             <Check className="w-4 h-4 text-[#789D74]" />
             <span>{dragFeedbackMessage}</span>
+          </div>
+        )}
+
+        {/* Mobile Tap-to-Move Sub-Folder Native Bottom Sheet Modal */}
+        {mobileSubProfileExercise && activeProfile && (
+          <div
+            onClick={() => setMobileSubProfileExercise(null)}
+            className="fixed inset-0 z-[999999] bg-black/70 backdrop-blur-sm flex items-end sm:hidden animate-fade-in"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full bg-[#1E1D1A] border-t border-[#CC6543]/40 rounded-t-3xl p-5 space-y-4 max-h-[80vh] overflow-y-auto animate-slide-up shadow-2xl"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-[#383530]">
+                <div className="min-w-0 flex-1 mr-2">
+                  <span className="text-[10px] uppercase font-bold text-[#CC6543] tracking-widest block">
+                    Move into Sub-Folder ({activeProfile})
+                  </span>
+                  <h3 className="text-lg font-bold text-white truncate">
+                    {mobileSubProfileExercise}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileSubProfileExercise(null)}
+                  className="p-1.5 rounded-full text-[#A8A297] hover:text-white bg-[#252320]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-xs text-[#A8A297] font-medium block pb-1">
+                  Select target sub-folder / section:
+                </span>
+
+                {/* Option: General / Root */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (onUpdateExerciseSubProfile && activeProfile) {
+                      await onUpdateExerciseSubProfile(mobileSubProfileExercise, activeProfile, null);
+                      setDragFeedbackMessage(`Removed "${mobileSubProfileExercise}" from sub-folder`);
+                      setTimeout(() => setDragFeedbackMessage(null), 3000);
+                    }
+                    setMobileSubProfileExercise(null);
+                  }}
+                  className="w-full p-3 rounded-xl bg-[#252320] border border-[#383530] hover:border-[#CC6543] text-left text-sm text-[#F5F2EB] flex items-center justify-between active:scale-98 transition"
+                >
+                  <span>General (No Sub-Folder)</span>
+                  <ArrowRight className="w-4 h-4 text-[#A8A297]" />
+                </button>
+
+                {/* Sub-Folders */}
+                {currentSubProfiles.map((sub) => (
+                  <button
+                    key={sub}
+                    type="button"
+                    onClick={async () => {
+                      if (onUpdateExerciseSubProfile && activeProfile) {
+                        await onUpdateExerciseSubProfile(mobileSubProfileExercise, activeProfile, sub);
+                        setDragFeedbackMessage(`Moved "${mobileSubProfileExercise}" into "${sub}"`);
+                        setTimeout(() => setDragFeedbackMessage(null), 3000);
+                      }
+                      setMobileSubProfileExercise(null);
+                    }}
+                    className="w-full p-3 rounded-xl bg-[#252320] border border-[#383530] hover:border-[#CC6543] text-left text-sm font-bold text-white flex items-center justify-between active:scale-98 transition"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Folder className="w-4 h-4 text-[#CC6543]" />
+                      <span>{sub}</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-[#CC6543]" />
+                  </button>
+                ))}
+
+                {/* Create New Sub-Folder Inline */}
+                <div className="pt-2 border-t border-[#383530]">
+                  {!isCreatingSubProfile ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingSubProfile(true)}
+                      className="w-full text-left px-2 py-1 text-xs text-[#CC6543] hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Create New Sub-Folder...</span>
+                    </button>
+                  ) : (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (newSubProfileName.trim() && onCreateSubProfile && activeProfile && onUpdateExerciseSubProfile) {
+                          const created = await onCreateSubProfile(activeProfile, newSubProfileName.trim());
+                          await onUpdateExerciseSubProfile(mobileSubProfileExercise, activeProfile, created);
+                          setNewSubProfileName('');
+                          setIsCreatingSubProfile(false);
+                          setMobileSubProfileExercise(null);
+                          setDragFeedbackMessage(`Moved "${mobileSubProfileExercise}" into "${created}"`);
+                          setTimeout(() => setDragFeedbackMessage(null), 3000);
+                        }
+                      }}
+                      className="space-y-2 pt-1"
+                    >
+                      <input
+                        type="text"
+                        placeholder="e.g. Not Enough Sleep Day..."
+                        value={newSubProfileName}
+                        onChange={(e) => setNewSubProfileName(e.target.value)}
+                        autoFocus
+                        className="w-full bg-[#191816] border border-[#CC6543] rounded-xl px-3 py-2 text-xs text-white placeholder-[#706B62] focus:outline-none"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={!newSubProfileName.trim()}
+                          className="px-3 py-1.5 rounded-lg bg-[#CC6543] disabled:opacity-40 text-white text-xs font-semibold"
+                        >
+                          Create & Move
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatingSubProfile(false);
+                            setNewSubProfileName('');
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-[#252320] text-xs text-[#A8A297]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

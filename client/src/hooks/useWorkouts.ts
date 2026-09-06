@@ -18,6 +18,7 @@ function generateUUID(): string {
 export function useWorkouts() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [customProfiles, setCustomProfiles] = useState<string[]>([]);
+  const [customSubProfiles, setCustomSubProfiles] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [syncState, setSyncState] = useState<SyncState>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -31,8 +32,10 @@ export function useWorkouts() {
     try {
       const data = await localDB.getAllWorkouts(false);
       const savedProfiles = await localDB.getCustomProfiles();
+      const savedSubProfiles = await localDB.getCustomSubProfiles();
       setWorkouts(data);
       setCustomProfiles(savedProfiles);
+      setCustomSubProfiles(savedSubProfiles);
     } catch (err) {
       console.error('Failed to load local workouts:', err);
     } finally {
@@ -88,6 +91,36 @@ export function useWorkouts() {
     return Array.from(profileSet).sort();
   }, [customProfiles, workouts]);
 
+  // Unique list of all active sub-profiles grouped by parent profile
+  const subProfiles = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+
+    // Add stored custom sub-profiles
+    Object.entries(customSubProfiles).forEach(([p, subs]) => {
+      if (!map[p]) map[p] = new Set();
+      if (Array.isArray(subs)) {
+        subs.forEach((s) => {
+          if (s && s.trim()) map[p].add(s.trim());
+        });
+      }
+    });
+
+    // Add sub-profiles present in logged workouts
+    workouts.forEach((w) => {
+      if (w.profile && w.profile.trim() && w.sub_profile && w.sub_profile.trim()) {
+        const p = w.profile.trim();
+        if (!map[p]) map[p] = new Set();
+        map[p].add(w.sub_profile.trim());
+      }
+    });
+
+    const result: Record<string, string[]> = {};
+    Object.entries(map).forEach(([p, set]) => {
+      result[p] = Array.from(set).sort();
+    });
+    return result;
+  }, [customSubProfiles, workouts]);
+
   // Create a new workout profile
   const createProfile = useCallback(
     async (profileName: string): Promise<string> => {
@@ -102,7 +135,7 @@ export function useWorkouts() {
     [customProfiles]
   );
 
-  // Delete a profile (removes profile and unassigns from workouts)
+  // Delete a profile (removes profile, cascades sub-profiles, and unassigns from workouts)
   const deleteProfile = useCallback(
     async (profileName: string) => {
       const trimmed = profileName.trim();
@@ -110,12 +143,19 @@ export function useWorkouts() {
       setCustomProfiles(updated);
       await localDB.saveCustomProfiles(updated);
 
+      // Also remove associated sub-profiles
+      const updatedSubs = { ...customSubProfiles };
+      delete updatedSubs[trimmed];
+      setCustomSubProfiles(updatedSubs);
+      await localDB.saveCustomSubProfiles(updatedSubs);
+
       // Unassign profile from matching workouts
       const workoutsWithProfile = workouts.filter((w) => w.profile === trimmed);
       for (const w of workoutsWithProfile) {
         await localDB.saveWorkout({
           ...w,
           profile: null,
+          sub_profile: null,
           sync_status: 'pending',
           updated_at: new Date().toISOString(),
         });
@@ -127,10 +167,10 @@ export function useWorkouts() {
         syncService.runSync().then(() => refreshLocalWorkouts());
       }
     },
-    [customProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+    [customProfiles, customSubProfiles, workouts, network.isOnline, refreshLocalWorkouts]
   );
 
-  // Rename a profile and migrate all associated workouts
+  // Rename a profile and migrate all associated workouts & sub-profiles
   const renameProfile = useCallback(
     async (oldName: string, newName: string): Promise<boolean> => {
       const trimmedOld = oldName.trim();
@@ -148,7 +188,16 @@ export function useWorkouts() {
       setCustomProfiles(uniqueProfiles);
       await localDB.saveCustomProfiles(uniqueProfiles);
 
-      // 2. Migrate all workouts assigned to oldName
+      // 2. Cascade sub-profiles from old name to new name
+      const updatedSubs = { ...customSubProfiles };
+      if (updatedSubs[trimmedOld]) {
+        updatedSubs[trimmedNew] = updatedSubs[trimmedOld];
+        delete updatedSubs[trimmedOld];
+        setCustomSubProfiles(updatedSubs);
+        await localDB.saveCustomSubProfiles(updatedSubs);
+      }
+
+      // 3. Migrate all workouts assigned to oldName
       const matchingWorkouts = workouts.filter(
         (w) => w.profile && w.profile.toLowerCase() === trimmedOld.toLowerCase()
       );
@@ -169,7 +218,216 @@ export function useWorkouts() {
 
       return true;
     },
-    [customProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+    [customProfiles, customSubProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+  );
+
+  // Create a new sub-profile (sub-folder) under a parent profile
+  const createSubProfile = useCallback(
+    async (profileName: string, subProfileName: string): Promise<string> => {
+      const trimmedProfile = profileName.trim();
+      const trimmedSub = subProfileName.trim();
+      if (!trimmedProfile || !trimmedSub) return '';
+
+      const currentSubs = customSubProfiles[trimmedProfile] || [];
+      if (!currentSubs.some((s) => s.toLowerCase() === trimmedSub.toLowerCase())) {
+        const next = {
+          ...customSubProfiles,
+          [trimmedProfile]: [...currentSubs, trimmedSub],
+        };
+        setCustomSubProfiles(next);
+        await localDB.saveCustomSubProfiles(next);
+      }
+      return trimmedSub;
+    },
+    [customSubProfiles]
+  );
+
+  // Rename a sub-profile and migrate all matching workouts
+  const renameSubProfile = useCallback(
+    async (profileName: string, oldName: string, newName: string): Promise<boolean> => {
+      const trimmedProfile = profileName.trim();
+      const trimmedOld = oldName.trim();
+      const trimmedNew = newName.trim();
+      if (!trimmedProfile || !trimmedNew || trimmedOld === trimmedNew) return false;
+
+      // 1. Update custom sub-profiles map
+      const currentSubs = customSubProfiles[trimmedProfile] || [];
+      const nextSubs = currentSubs.map((s) =>
+        s.toLowerCase() === trimmedOld.toLowerCase() ? trimmedNew : s
+      );
+      if (!nextSubs.some((s) => s.toLowerCase() === trimmedNew.toLowerCase())) {
+        nextSubs.push(trimmedNew);
+      }
+      const uniqueSubs = Array.from(new Set(nextSubs));
+      const updatedMap = {
+        ...customSubProfiles,
+        [trimmedProfile]: uniqueSubs,
+      };
+      setCustomSubProfiles(updatedMap);
+      await localDB.saveCustomSubProfiles(updatedMap);
+
+      // 2. Migrate matching workouts
+      const matching = workouts.filter(
+        (w) =>
+          w.profile &&
+          w.profile.toLowerCase() === trimmedProfile.toLowerCase() &&
+          w.sub_profile &&
+          w.sub_profile.toLowerCase() === trimmedOld.toLowerCase()
+      );
+
+      for (const w of matching) {
+        await localDB.saveWorkout({
+          ...w,
+          sub_profile: trimmedNew,
+          sync_status: 'pending',
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+
+      return true;
+    },
+    [customSubProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+  );
+
+  // Delete a sub-profile (unassigns sub_profile from matching workouts without deleting them)
+  const deleteSubProfile = useCallback(
+    async (profileName: string, subProfileName: string): Promise<void> => {
+      const trimmedProfile = profileName.trim();
+      const trimmedSub = subProfileName.trim();
+      if (!trimmedProfile || !trimmedSub) return;
+
+      // 1. Remove from custom sub profiles
+      const currentSubs = customSubProfiles[trimmedProfile] || [];
+      const nextSubs = currentSubs.filter(
+        (s) => s.toLowerCase() !== trimmedSub.toLowerCase()
+      );
+      const updatedMap = {
+        ...customSubProfiles,
+        [trimmedProfile]: nextSubs,
+      };
+      setCustomSubProfiles(updatedMap);
+      await localDB.saveCustomSubProfiles(updatedMap);
+
+      // 2. Unassign sub_profile from matching workouts
+      const matching = workouts.filter(
+        (w) =>
+          w.profile &&
+          w.profile.toLowerCase() === trimmedProfile.toLowerCase() &&
+          w.sub_profile &&
+          w.sub_profile.toLowerCase() === trimmedSub.toLowerCase()
+      );
+
+      for (const w of matching) {
+        await localDB.saveWorkout({
+          ...w,
+          sub_profile: null,
+          sync_status: 'pending',
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+    },
+    [customSubProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+  );
+
+  // Update sub-profile for an exercise within a specific parent profile
+  const updateExerciseSubProfile = useCallback(
+    async (exerciseName: string, profileName: string, subProfile: string | null): Promise<void> => {
+      const trimmedProfile = profileName.trim();
+      const trimmedSub = subProfile ? subProfile.trim() : null;
+
+      // Register sub-profile if new
+      if (trimmedSub) {
+        const currentSubs = customSubProfiles[trimmedProfile] || [];
+        if (!currentSubs.some((s) => s.toLowerCase() === trimmedSub.toLowerCase())) {
+          const nextMap = {
+            ...customSubProfiles,
+            [trimmedProfile]: [...currentSubs, trimmedSub],
+          };
+          setCustomSubProfiles(nextMap);
+          await localDB.saveCustomSubProfiles(nextMap);
+        }
+      }
+
+      // Update matching workouts
+      const matching = workouts.filter(
+        (w) =>
+          w.exercise_name.toLowerCase() === exerciseName.toLowerCase() &&
+          w.profile &&
+          w.profile.toLowerCase() === trimmedProfile.toLowerCase()
+      );
+
+      for (const w of matching) {
+        await localDB.saveWorkout({
+          ...w,
+          sub_profile: trimmedSub,
+          sync_status: 'pending',
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+    },
+    [customSubProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+  );
+
+  // Bulk update sub-profile for multiple exercises within a parent profile
+  const bulkUpdateExerciseSubProfile = useCallback(
+    async (exerciseNames: string[], profileName: string, subProfile: string | null): Promise<void> => {
+      const trimmedProfile = profileName.trim();
+      const trimmedSub = subProfile ? subProfile.trim() : null;
+      const nameSet = new Set(exerciseNames.map((n) => n.toLowerCase()));
+
+      if (trimmedSub) {
+        const currentSubs = customSubProfiles[trimmedProfile] || [];
+        if (!currentSubs.some((s) => s.toLowerCase() === trimmedSub.toLowerCase())) {
+          const nextMap = {
+            ...customSubProfiles,
+            [trimmedProfile]: [...currentSubs, trimmedSub],
+          };
+          setCustomSubProfiles(nextMap);
+          await localDB.saveCustomSubProfiles(nextMap);
+        }
+      }
+
+      const matching = workouts.filter(
+        (w) =>
+          nameSet.has(w.exercise_name.toLowerCase()) &&
+          w.profile &&
+          w.profile.toLowerCase() === trimmedProfile.toLowerCase()
+      );
+
+      for (const w of matching) {
+        await localDB.saveWorkout({
+          ...w,
+          sub_profile: trimmedSub,
+          sync_status: 'pending',
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+    },
+    [customSubProfiles, workouts, network.isOnline, refreshLocalWorkouts]
   );
 
   // Update profile for all entries of an exercise
@@ -265,11 +523,13 @@ export function useWorkouts() {
       rir: number;
       weight?: number | null;
       profile?: string | null;
+      sub_profile?: string | null;
       date: string;
       notes?: string;
     }) => {
       const now = new Date().toISOString();
       const trimmedProfile = data.profile ? data.profile.trim() : null;
+      const trimmedSubProfile = data.sub_profile ? data.sub_profile.trim() : null;
 
       const newWorkout: Workout = {
         id: generateUUID(),
@@ -279,6 +539,7 @@ export function useWorkouts() {
         rir: data.rir,
         weight: data.weight ?? null,
         profile: trimmedProfile,
+        sub_profile: trimmedSubProfile,
         date: data.date || now.split('T')[0],
         notes: data.notes?.trim() || null,
         created_at: now,
@@ -294,18 +555,31 @@ export function useWorkouts() {
         await localDB.saveCustomProfiles(nextProfiles);
       }
 
-      // 2. Save immediately to local IndexedDB
+      // 2. If sub_profile is new, also save to custom sub-profiles
+      if (trimmedProfile && trimmedSubProfile) {
+        const currentSubs = customSubProfiles[trimmedProfile] || [];
+        if (!currentSubs.some((s) => s.toLowerCase() === trimmedSubProfile.toLowerCase())) {
+          const nextSubs = {
+            ...customSubProfiles,
+            [trimmedProfile]: [...currentSubs, trimmedSubProfile],
+          };
+          setCustomSubProfiles(nextSubs);
+          await localDB.saveCustomSubProfiles(nextSubs);
+        }
+      }
+
+      // 3. Save immediately to local IndexedDB
       await localDB.saveWorkout(newWorkout);
       await refreshLocalWorkouts();
 
-      // 3. If online, initiate background sync
+      // 4. If online, initiate background sync
       if (network.isOnline) {
         syncService.runSync().then(() => refreshLocalWorkouts());
       }
 
       return newWorkout;
     },
-    [customProfiles, network.isOnline, refreshLocalWorkouts]
+    [customProfiles, customSubProfiles, network.isOnline, refreshLocalWorkouts]
   );
 
   // Delete a single workout entry by ID
@@ -400,12 +674,18 @@ export function useWorkouts() {
     workouts: filteredWorkouts,
     allWorkouts: workouts,
     profiles,
+    subProfiles,
     createProfile,
     deleteProfile,
     renameProfile,
+    createSubProfile,
+    renameSubProfile,
+    deleteSubProfile,
     deleteExercise,
     updateExerciseProfile,
+    updateExerciseSubProfile,
     bulkUpdateExerciseProfile,
+    bulkUpdateExerciseSubProfile,
     bulkDeleteExercises,
     loading,
     syncState,

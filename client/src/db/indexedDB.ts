@@ -250,6 +250,38 @@ class LocalDatabase {
       console.error('Error saving custom profiles:', e);
     }
   }
+
+  // Get custom sub-profiles grouped by parent profile
+  public async getCustomSubProfiles(): Promise<Record<string, string[]>> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(METADATA_STORE, 'readonly');
+        const store = tx.objectStore(METADATA_STORE);
+        const req = store.get('custom_workout_sub_profiles');
+        req.onsuccess = () => resolve(req.result?.value || {});
+        req.onerror = () => resolve({});
+      });
+    } catch {
+      return {};
+    }
+  }
+
+  // Save custom sub-profiles
+  public async saveCustomSubProfiles(subProfiles: Record<string, string[]>): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(METADATA_STORE, 'readwrite');
+        const store = tx.objectStore(METADATA_STORE);
+        const req = store.put({ key: 'custom_workout_sub_profiles', value: subProfiles });
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.error('Error saving custom sub profiles:', e);
+    }
+  }
 }
 
 export const localDB = new LocalDatabase();

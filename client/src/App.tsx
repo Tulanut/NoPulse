@@ -18,11 +18,17 @@ export const App: React.FC = () => {
   const {
     allWorkouts,
     profiles,
+    subProfiles,
     createProfile,
     deleteProfile,
     renameProfile,
+    createSubProfile,
+    renameSubProfile,
+    deleteSubProfile,
     deleteExercise,
+    updateExerciseSubProfile,
     bulkUpdateExerciseProfile,
+    bulkUpdateExerciseSubProfile,
     bulkDeleteExercises,
     syncState,
     lastSyncedAt,
@@ -195,11 +201,17 @@ export const App: React.FC = () => {
             <ExerciseHub
               workouts={allWorkouts}
               profiles={profiles}
+              subProfiles={subProfiles}
               onCreateProfile={createProfile}
               onDeleteProfile={deleteProfile}
               onRenameProfile={renameProfile}
+              onCreateSubProfile={createSubProfile}
+              onRenameSubProfile={renameSubProfile}
+              onDeleteSubProfile={deleteSubProfile}
               onDeleteExercise={deleteExercise}
+              onUpdateExerciseSubProfile={updateExerciseSubProfile}
               onBulkUpdateExerciseProfile={bulkUpdateExerciseProfile}
+              onBulkUpdateExerciseSubProfile={bulkUpdateExerciseSubProfile}
               onBulkDeleteExercises={bulkDeleteExercises}
               onSelectExercise={handleSelectExercise}
               onGoToLog={() => setCurrentScreen('log')}

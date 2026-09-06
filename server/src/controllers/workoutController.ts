@@ -36,7 +36,7 @@ export class WorkoutController {
 
   public static async createWorkout(req: Request, res: Response): Promise<void> {
     try {
-      const { exercise_name, sets, reps, rir, weight, profile, date, notes } = req.body;
+      const { exercise_name, sets, reps, rir, weight, profile, sub_profile, date, notes } = req.body;
 
       if (!exercise_name || typeof exercise_name !== 'string' || exercise_name.trim() === '') {
         res.status(400).json({ success: false, error: 'Exercise name is required' });
@@ -48,6 +48,7 @@ export class WorkoutController {
       const numRir = Number(rir);
       const numWeight = weight !== undefined && weight !== null && weight !== '' ? Number(weight) : null;
       const cleanProfile = profile && typeof profile === 'string' && profile.trim() ? profile.trim() : null;
+      const cleanSubProfile = sub_profile && typeof sub_profile === 'string' && sub_profile.trim() ? sub_profile.trim() : null;
 
       if (isNaN(numSets) || numSets <= 0 || !Number.isInteger(numSets)) {
         res.status(400).json({ success: false, error: 'Sets must be a positive integer' });
@@ -75,6 +76,7 @@ export class WorkoutController {
         rir: numRir,
         weight: numWeight,
         profile: cleanProfile,
+        sub_profile: cleanSubProfile,
         date: workoutDate,
         notes: notes ? String(notes).trim() : null,
         created_at: req.body.created_at || now,
@@ -110,6 +112,7 @@ export class WorkoutController {
             rir: Number(w.rir) ?? 0,
             weight: w.weight !== undefined && w.weight !== null ? Number(w.weight) : null,
             profile: w.profile ? String(w.profile).trim() : null,
+            sub_profile: w.sub_profile ? String(w.sub_profile).trim() : null,
             date: w.date || now.split('T')[0],
             notes: w.notes || null,
             created_at: w.created_at || now,
