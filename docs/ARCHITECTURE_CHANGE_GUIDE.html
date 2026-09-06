@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Full-Stack Architecture Change Playbook — Junior SWE Guide</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --text-muted: #8b949e;
+      --primary: #58a6ff;
+      --accent: #f78166;
+      --success: #3fb950;
+      --code-bg: #1f242c;
+      --pre-bg: #0b0e14;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #ffffff;
+        --surface: #f6f8fa;
+        --border: #d0d7de;
+        --text: #24292f;
+        --text-bright: #1f2328;
+        --text-muted: #57606a;
+        --primary: #0969da;
+        --accent: #bc4c00;
+        --success: #1a7f37;
+        --code-bg: #eaeef2;
+        --pre-bg: #f6f8fa;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #111827 !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      pre {
+        background: #f3f4f6 !important;
+        color: #111827 !important;
+        border: 1px solid #e5e7eb !important;
+        page-break-inside: avoid;
+      }
+      table {
+        page-break-inside: avoid;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.68;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(88, 166, 255, 0.12), rgba(247, 129, 102, 0.12));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+      line-height: 1.25;
+    }
+
+    .subtitle {
+      font-size: 1.15rem;
+      color: var(--accent);
+      font-style: italic;
+      margin-bottom: 16px;
+    }
+
+    .target-badge {
+      display: inline-block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      color: var(--primary);
+    }
+
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 10px 18px;
+      background-color: var(--accent);
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+      font-size: 0.9rem;
+      transition: opacity 0.2s;
+    }
+
+    .download-btn:hover {
+      opacity: 0.9;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      color: var(--text-bright);
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      color: var(--text-bright);
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    h4 {
+      font-size: 1.05rem;
+      color: var(--primary);
+      margin-top: 18px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 16px;
+    }
+
+    ul, ol {
+      margin-bottom: 16px;
+      padding-left: 28px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.88em;
+      background-color: var(--code-bg);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    pre {
+      background-color: var(--pre-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background-color: transparent;
+      color: var(--text);
+      padding: 0;
+      font-size: 0.9rem;
+    }
+
+    blockquote {
+      border-left: 4px solid var(--accent);
+      padding: 12px 20px;
+      background-color: var(--surface);
+      margin-bottom: 20px;
+      border-radius: 0 8px 8px 0;
+      font-style: italic;
+    }
+
+    .callout {
+      border-left: 4px solid var(--primary);
+      background-color: var(--surface);
+      padding: 16px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 24px;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+
+    .grid-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 768px) {
+      .grid-compare {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card-bad {
+      background-color: rgba(248, 81, 73, 0.08);
+      border: 1px solid rgba(248, 81, 73, 0.4);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .card-good {
+      background-color: rgba(63, 185, 80, 0.08);
+      border: 1px solid rgba(63, 185, 80, 0.4);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      text-align: left;
+    }
+
+    th {
+      background-color: var(--surface);
+      color: var(--text-bright);
+    }
+
+    tr:nth-child(even) {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-banner">
+      <h1>The Full-Stack Architecture Change Playbook</h1>
+      <div class="subtitle">How to Methodically Implement Big Features from Database to UI Without Bugs, Mess, or Headaches</div>
+      <div class="target-badge">🎓 Production-Grade Engineering Guide for Junior Software Engineers</div>
+      <div class="no-print" style="margin-top: 14px;">
+        <button onclick="window.print()" class="download-btn">
+          🖨️ Print / Save as PDF
+        </button>
+        <span style="font-size: 0.85rem; color: var(--text-muted); margin-left: 12px;">
+          (Tip: Select "Save as PDF" destination in your print dialog)
+        </span>
+      </div>
+    </div>
+
+    <!-- Section 1 -->
+    <h2>1. The Mindset Shift: Newbie Chaos vs. Senior Method</h2>
+    <p>
+      When your employer or tech lead says:  
+      <blockquote>"Allow users to create nested sub-folders inside their workout profiles, drag exercises into them, and filter by section."</blockquote>
+      Here is the fundamental difference in how junior engineers vs. senior engineers approach the problem:
+    </p>
+
+    <div class="grid-compare">
+      <div class="card-bad">
+        <div class="card-title" style="color: #f85149;">❌ The "Outside-In" Trap (Newbie Way)</div>
+        <ol>
+          <li><strong>Starts in UI:</strong> Immediately jumps into React components and hacks buttons and local state.</li>
+          <li><strong>Data Loss:</strong> Realizes state disappears on page reload.</li>
+          <li><strong>Hasty DB Hacks:</strong> Blindly alters the database schema, breaking existing records.</li>
+          <li><strong>Broken Sync:</strong> Older records missing the field cause offline sync to crash.</li>
+          <li><strong>Compiler Hell:</strong> 50+ TypeScript red squiggles pop up across files.</li>
+        </ol>
+      </div>
+
+      <div class="card-good">
+        <div class="card-title" style="color: #3fb950;">✅ The "Data-First" Pipeline (Senior Way)</div>
+        <ol>
+          <li><strong>Contract First:</strong> Updates domain interfaces in TypeScript.</li>
+          <li><strong>Idempotent DB Migration:</strong> Checks schema before altering; sets safe defaults.</li>
+          <li><strong>Transport & API:</strong> Unpacks and sanitizes payloads in backend controllers.</li>
+          <li><strong>Offline Storage:</strong> Persists metadata in IndexedDB so empty categories survive reloads.</li>
+          <li><strong>Business Hooks:</strong> Handles cascading renames and safe deletions before touching UI.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="callout-title">💡 The Golden Rule of Full-Stack Engineering</div>
+      Never write a single line of JSX, HTML, or CSS until your domain contracts, database migrations, and business logic compile with <strong>zero errors</strong>.
+    </div>
+
+    <!-- Section 2 -->
+    <h2>2. The 8-Stage Feature Pipeline</h2>
+    <p>Every feature follows this unidirectional dependency chain:</p>
+
+    <pre><code>[Stage 1: Types & Contracts]  ──> client/src/types/workout.ts & server/src/types/workout.ts
+              │
+[Stage 2: Persistent Storage]  ──> server/src/db/database.ts (SQLite auto-migration & index)
+              │
+[Stage 3: Transport & API]     ──> server/src/controllers/workoutController.ts
+              │
+[Stage 4: Client Offline Cache]──> client/src/db/indexedDB.ts (IndexedDB key-value metadata)
+              │
+[Stage 5: Business Logic Hook] ──> client/src/hooks/useWorkouts.ts (Cascades, memoization)
+              │
+[Stage 6: Root Orchestration]  ──> client/src/App.tsx (Unidirectional prop drilling, toasts)
+              │
+[Stage 7: UI & Mobile UX]      ──> ExerciseHub.tsx & WorkoutForm.tsx (Touch, Bottom Sheet, D&D)
+              │
+[Stage 8: Compilation & Git]   ──> npm run build (0 errors) -> Atomic commit -> Wait for push cmd</code></pre>
+
+    <!-- Section 3 -->
+    <h2>3. Case Study: Implementing Sub-Folder Groupings</h2>
+
+    <h3>Stage 1: The Contract (Domain Types)</h3>
+    <p>Files: <code>client/src/types/workout.ts</code> & <code>server/src/types/workout.ts</code></p>
+    <pre><code>export interface Workout {
+  id: string;
+  exercise_name: string;
+  sets: number;
+  reps: number;
+  rir: number;
+  weight: number | null;
+  profile?: string | null;
+  sub_profile?: string | null; // <--- The single source of truth
+  date: string;
+  notes?: string | null;
+}</code></pre>
+    <p><strong>Key Lesson:</strong> Making <code>sub_profile?: string | null</code> optional and nullable guarantees 100% backward compatibility for existing records.</p>
+
+    <h3>Stage 2: Persistent Storage & Migrations (SQLite)</h3>
+    <p>File: <code>server/src/db/database.ts</code></p>
+    <pre><code>// 1. Safe Schema Auto-Migration
+const tableInfo = db.prepare("PRAGMA table_info(workouts)").all() as Array<{ name: string }>;
+const columnNames = tableInfo.map((col) => col.name);
+
+if (!columnNames.includes('sub_profile')) {
+  db.exec('ALTER TABLE workouts ADD COLUMN sub_profile TEXT');
+  console.log('Migrated workouts table: added sub_profile column');
+}
+
+// 2. High Performance Database Index
+db.exec('CREATE INDEX IF NOT EXISTS idx_workouts_sub_profile ON workouts(sub_profile);');</code></pre>
+    <p><strong>Key Lesson:</strong> In SQLite, running <code>ALTER TABLE ADD COLUMN</code> directly on an existing table will crash if the column exists. Checking <code>PRAGMA table_info</code> first guarantees an <em>idempotent migration</em>.</p>
+
+    <h3>Stage 3: Network API & Sync Transport (Express)</h3>
+    <p>File: <code>server/src/controllers/workoutController.ts</code></p>
+    <pre><code>// Unpack, sanitize and persist in upsert query
+const workout: Workout = {
+  id: id || uuidv4(),
+  exercise_name,
+  sets: Number(sets),
+  reps: Number(reps),
+  rir: Number(rir),
+  weight: weight !== undefined ? (weight !== null ? Number(weight) : null) : null,
+  profile: profile || null,
+  sub_profile: sub_profile || null, // <--- Sanitized
+  date: date || new Date().toISOString().split('T')[0],
+  notes: notes || null,
+};
+upsertWorkout(workout);</code></pre>
+
+    <h3>Stage 4: Client Offline Storage (IndexedDB)</h3>
+    <p>File: <code>client/src/db/indexedDB.ts</code></p>
+    <p>Because newly created sub-folders don't have exercises yet, storing sub-folders purely as workout attributes would cause empty folders to vanish on refresh. Storing metadata solves this:</p>
+    <pre><code>const SUB_PROFILES_META_KEY = 'custom_sub_profiles_map';
+
+export async function getCustomSubProfiles(): Promise<Record<string, string[]>> {
+  const db = await initDB();
+  const raw = await db.get(SYNC_QUEUE_STORE, SUB_PROFILES_META_KEY);
+  return raw ? JSON.parse(raw) : {};
+}
+
+export async function saveCustomSubProfiles(map: Record<string, string[]>): Promise<void> {
+  const db = await initDB();
+  await db.put(SYNC_QUEUE_STORE, JSON.stringify(map), SUB_PROFILES_META_KEY);
+}</code></pre>
+
+    <h3>Stage 5: State Management & Business Rules (React Hooks)</h3>
+    <p>File: <code>client/src/hooks/useWorkouts.ts</code></p>
+    <p>Encapsulate state mutations and cascading operations away from UI components:</p>
+    <ul>
+      <li><strong>Cascading Rename:</strong> When a sub-folder is renamed, update metadata AND migrate all matching workout records in IndexedDB + schedule background server sync.</li>
+      <li><strong>Safe Deletion:</strong> Never delete user exercises when deleting a sub-folder! Instead, set <code>sub_profile = null</code> so exercises revert safely to the parent profile's General section.</li>
+    </ul>
+
+    <h3>Stage 6 & 7: UI, Mobile Touch & Ergonomics</h3>
+    <p>Files: <code>ExerciseHub.tsx</code> & <code>WorkoutForm.tsx</code></p>
+    <ul>
+      <li><strong>Desktop Drag & Drop:</strong> Drag cards directly onto sub-folder chips with target priority.</li>
+      <li><strong>Mobile Touch Drag:</strong> Active touch listeners with haptic vibration feedback and edge auto-scrolling.</li>
+      <li><strong>1-Tap Mobile Bottom Sheet:</strong> An accessible modal to move exercises without dragging.</li>
+      <li><strong>Direct Workout Logging:</strong> Selecting a profile reveals sub-folder pill chips for instant assignment.</li>
+    </ul>
+
+    <h3>Stage 8: Build Verification</h3>
+    <pre><code># Client check
+cd client; npm run build  # tsc -b && vite build
+
+# Server check
+cd server; npm run build  # tsc</code></pre>
+
+    <!-- Section 4 -->
+    <h2>4. The Junior SWE Universal Checklist</h2>
+    <p>Print or reference this 10-point checklist on the job for any full-stack task:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Step</th>
+          <th>Phase</th>
+          <th>Task Description</th>
+          <th>Critical Question to Ask</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>1</strong></td>
+          <td>Contracts</td>
+          <td>Define TypeScript interfaces & DTOs</td>
+          <td><em>Is the new field optional/nullable for legacy data?</em></td>
+        </tr>
+        <tr>
+          <td><strong>2</strong></td>
+          <td>Database</td>
+          <td>Write idempotent migration (ALTER TABLE)</td>
+          <td><em>What happens if the DB already has 50,000 rows?</em></td>
+        </tr>
+        <tr>
+          <td><strong>3</strong></td>
+          <td>Indexes</td>
+          <td>Add DB index on query/filter columns</td>
+          <td><em>Will users filter, search, or join on this column?</em></td>
+        </tr>
+        <tr>
+          <td><strong>4</strong></td>
+          <td>Transport</td>
+          <td>Update API controllers & payload sanitization</td>
+          <td><em>Are inputs protected against nulls and SQL injection?</em></td>
+        </tr>
+        <tr>
+          <td><strong>5</strong></td>
+          <td>Offline Cache</td>
+          <td>Update IndexedDB / local storage persistence</td>
+          <td><em>Do empty folders/categories survive page reloads?</em></td>
+        </tr>
+        <tr>
+          <td><strong>6</strong></td>
+          <td>Business Logic</td>
+          <td>Build hooks with cascading rename/delete rules</td>
+          <td><em>What happens to children if parent is deleted?</em></td>
+        </tr>
+        <tr>
+          <td><strong>7</strong></td>
+          <td>App Wiring</td>
+          <td>Connect state down cleanly via props/context</td>
+          <td><em>Is data flow strictly unidirectional?</em></td>
+        </tr>
+        <tr>
+          <td><strong>8</strong></td>
+          <td>UI & Mobile</td>
+          <td>Build desktop + touch + 1-tap accessible UX</td>
+          <td><em>Can a mobile user do this easily with one thumb?</em></td>
+        </tr>
+        <tr>
+          <td><strong>9</strong></td>
+          <td>Verification</td>
+          <td>Run compile & production bundler commands</td>
+          <td><em>Does the compiler pass with 0 errors and 0 warnings?</em></td>
+        </tr>
+        <tr>
+          <td><strong>10</strong></td>
+          <td>Git Safety</td>
+          <td>Commit locally with semantic tags; await push approval</td>
+          <td><em>Are commits atomic? Did I avoid pushing unreviewed code?</em></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 5 -->
+    <h2>5. Top 5 Traps That Break Production</h2>
+    <div class="card-bad" style="margin-bottom: 16px;">
+      <div class="card-title" style="color: #f85149;">Trap 1: The Destructive Database Reset</div>
+      <p>Never drop tables or recreate databases in development. Always write migrations that would safely run on a live customer database.</p>
+    </div>
+
+    <div class="card-bad" style="margin-bottom: 16px;">
+      <div class="card-title" style="color: #f85149;">Trap 2: The Orphaned Records Bug</div>
+      <p>Deleting a parent folder must never delete its items or leave invalid foreign keys. Safely reassign children to <code>null</code> (General root).</p>
+    </div>
+
+    <div class="card-bad" style="margin-bottom: 16px;">
+      <div class="card-title" style="color: #f85149;">Trap 3: Desktop-Only Drag Assumption</div>
+      <p>Mouse drag events don't work reliably on mobile touchscreens. Always provide a 1-tap accessible alternative (like a bottom sheet).</p>
+    </div>
+
+    <div class="card-bad" style="margin-bottom: 16px;">
+      <div class="card-title" style="color: #f85149;">Trap 4: Empty String vs. NULL Mismatch</div>
+      <p>Never mix <code>""</code> and <code>null</code>. Standardize in your business layer so SQL queries like <code>WHERE col IS NULL</code> work predictably.</p>
+    </div>
+
+    <div class="card-bad">
+      <div class="card-title" style="color: #f85149;">Trap 5: Scattered Business Logic in UI</div>
+      <p>Never write database queries directly inside button <code>onClick</code> handlers. Keep UI dumb and business rules isolated in hooks.</p>
+    </div>
+
+    <div style="margin-top: 48px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+      Document generated for NoPulse Project • Architecture & Best Practices Reference
+    </div>
+  </div>
+</body>
+</html>
