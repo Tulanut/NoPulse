@@ -3,7 +3,9 @@ import { Plus, Calendar, FolderPlus, X, Tag } from 'lucide-react';
 
 interface WorkoutFormProps {
   profiles?: string[];
+  subProfiles?: Record<string, string[]>;
   onCreateProfile?: (name: string) => Promise<string>;
+  onCreateSubProfile?: (profile: string, subName: string) => Promise<string>;
   onAddWorkout: (data: {
     exercise_name: string;
     sets: number;
@@ -11,10 +13,11 @@ interface WorkoutFormProps {
     rir: number;
     weight?: number | null;
     profile?: string | null;
+    sub_profile?: string | null;
     date: string;
     notes?: string;
   }) => Promise<any>;
-  onWorkoutLogged?: (exerciseName: string, profile?: string | null) => void;
+  onWorkoutLogged?: (exerciseName: string, profile?: string | null, subProfile?: string | null) => void;
   onBack?: () => void;
   onSuccessNavigate?: (exerciseName: string) => void;
 }
@@ -29,7 +32,9 @@ const RIR_OPTIONS = [
 
 export const WorkoutForm: React.FC<WorkoutFormProps> = ({
   profiles = [],
+  subProfiles = {},
   onCreateProfile,
+  onCreateSubProfile,
   onAddWorkout,
   onWorkoutLogged,
 }) => {
@@ -42,8 +47,11 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
   const [weight, setWeight] = useState<string>('');
   const [rir, setRir] = useState<number>(2);
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
+  const [selectedSubProfile, setSelectedSubProfile] = useState<string | null>(null);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [isCreatingSubProfile, setIsCreatingSubProfile] = useState(false);
   const [newProfileName, setNewProfileName] = useState('');
+  const [newSubProfileName, setNewSubProfileName] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,10 +97,24 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
         setNewProfileName('');
       }
 
+      // Auto-resolve sub-profile if user typed a new sub-profile
+      let effectiveSubProfile: string | null = effectiveProfile ? selectedSubProfile : null;
+      if (effectiveProfile && isCreatingSubProfile && newSubProfileName.trim()) {
+        const trimmedSub = newSubProfileName.trim();
+        if (onCreateSubProfile) {
+          effectiveSubProfile = await onCreateSubProfile(effectiveProfile, trimmedSub);
+        } else {
+          effectiveSubProfile = trimmedSub;
+        }
+        setSelectedSubProfile(effectiveSubProfile);
+        setIsCreatingSubProfile(false);
+        setNewSubProfileName('');
+      }
+
       const loggedName = exerciseName.trim();
       const parsedWeight = weight.trim() !== '' ? parseFloat(weight) : null;
 
-      // 2. Save directly into the chosen profile
+      // 2. Save directly into the chosen profile & sub-profile
       await onAddWorkout({
         exercise_name: loggedName,
         sets: numSets,
@@ -100,12 +122,13 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
         rir,
         weight: parsedWeight,
         profile: effectiveProfile,
+        sub_profile: effectiveSubProfile,
         date: effectiveDate,
         notes: notes.trim() || undefined,
       });
 
       if (onWorkoutLogged) {
-        onWorkoutLogged(loggedName, effectiveProfile);
+        onWorkoutLogged(loggedName, effectiveProfile, effectiveSubProfile);
       }
       setNotes('');
     } catch (err: any) {
@@ -121,8 +144,19 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
 
     const created = await onCreateProfile(newProfileName.trim());
     setSelectedProfile(created);
+    setSelectedSubProfile(null);
     setNewProfileName('');
     setIsCreatingProfile(false);
+  };
+
+  const handleCreateSubProfileInline = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubProfileName.trim() || !selectedProfile || !onCreateSubProfile) return;
+
+    const created = await onCreateSubProfile(selectedProfile, newSubProfileName.trim());
+    setSelectedSubProfile(created);
+    setNewSubProfileName('');
+    setIsCreatingSubProfile(false);
   };
 
   const adjustSets = (delta: number) => {
@@ -208,7 +242,9 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
               type="button"
               onClick={() => {
                 setSelectedProfile(null);
+                setSelectedSubProfile(null);
                 setIsCreatingProfile(false);
+                setIsCreatingSubProfile(false);
               }}
               className={`px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 ${
                 selectedProfile === null && !isCreatingProfile
@@ -228,7 +264,9 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
                   type="button"
                   onClick={() => {
                     setSelectedProfile(p);
+                    setSelectedSubProfile(null);
                     setIsCreatingProfile(false);
+                    setIsCreatingSubProfile(false);
                   }}
                   className={`px-3.5 py-1.5 rounded-full text-xs transition-all duration-200 ${
                     isSelected
@@ -249,6 +287,8 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
                   onClick={() => {
                     setIsCreatingProfile(true);
                     setSelectedProfile(null);
+                    setSelectedSubProfile(null);
+                    setIsCreatingSubProfile(false);
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-[#252320]/60 border border-dashed border-[#4D4740] text-[#A8A297] hover:text-[#F5F2EB] hover:border-[#CC6543] transition-all"
                 >
@@ -290,6 +330,108 @@ export const WorkoutForm: React.FC<WorkoutFormProps> = ({
                   </button>
                 </div>
               )
+            )}
+
+            {/* Sub-Folder selection when a profile is selected */}
+            {selectedProfile && (
+              <div className="w-full pt-3 mt-1 border-t border-[#383530]/40 space-y-2 animate-slide-up">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] tracking-wider uppercase text-[#A8A297] font-medium flex items-center gap-1.5">
+                    <span>Sub-Folder in {selectedProfile}</span>
+                    <span className="text-[10px] text-[#706B62] font-normal">(Optional)</span>
+                  </label>
+                  {selectedSubProfile && (
+                    <span className="text-[11px] font-semibold text-[#CC6543] flex items-center gap-1">
+                      📁 {selectedSubProfile}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSubProfile(null);
+                      setIsCreatingSubProfile(false);
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs transition-all duration-200 ${
+                      selectedSubProfile === null && !isCreatingSubProfile
+                        ? 'bg-[#383530] text-white font-semibold'
+                        : 'bg-[#1C1A17] border border-[#2E2B27] text-[#706B62] hover:text-[#A8A297]'
+                    }`}
+                  >
+                    General (No Sub-Folder)
+                  </button>
+
+                  {(subProfiles[selectedProfile] || []).map((sub) => {
+                    const isSelected = selectedSubProfile === sub && !isCreatingSubProfile;
+                    return (
+                      <button
+                        key={sub}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSubProfile(sub);
+                          setIsCreatingSubProfile(false);
+                        }}
+                        className={`px-3 py-1 rounded-full text-xs transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-[#CC6543]/20 border border-[#CC6543] text-[#CC6543] font-bold shadow-sm'
+                            : 'bg-[#1C1A17] border border-[#2E2B27] text-[#A8A297] hover:text-[#F5F2EB]'
+                        }`}
+                      >
+                        📁 {sub}
+                      </button>
+                    );
+                  })}
+
+                  {onCreateSubProfile && (
+                    !isCreatingSubProfile ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingSubProfile(true)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-[#1C1A17] border border-dashed border-[#383530] text-[#706B62] hover:text-[#CC6543] hover:border-[#CC6543] transition-all"
+                      >
+                        <FolderPlus className="w-3 h-3 text-[#CC6543]" />
+                        <span>+ Sub-Folder</span>
+                      </button>
+                    ) : (
+                      <div className="inline-flex items-center gap-1.5 bg-[#1C1A17] border border-[#CC6543] rounded-full px-2.5 py-0.5 animate-pop-in">
+                        <input
+                          type="text"
+                          placeholder="e.g. Enough Sleep Day..."
+                          value={newSubProfileName}
+                          onChange={(e) => setNewSubProfileName(e.target.value)}
+                          autoFocus
+                          className="bg-transparent text-xs text-[#F5F2EB] placeholder-[#524E48] focus:outline-none w-44"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleCreateSubProfileInline(e);
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCreateSubProfileInline}
+                          className="text-[10px] uppercase font-bold text-[#CC6543] hover:text-[#DE7C5A] px-1"
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatingSubProfile(false);
+                            setNewSubProfileName('');
+                          }}
+                          className="text-[#706B62] hover:text-[#F5F2EB]"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>

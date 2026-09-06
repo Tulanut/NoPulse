@@ -47,8 +47,16 @@ export const App: React.FC = () => {
   // Global Viewport-Locked Toast Notification (Screen-Positioned, Zero Blur)
   const [activeToast, setActiveToast] = useState<ActiveToast | null>(null);
 
-  const handleWorkoutLogged = (exerciseName: string, profile?: string | null) => {
-    setActiveToast({ exerciseName, profile });
+  const handleWorkoutLogged = (
+    exerciseName: string,
+    profile?: string | null,
+    subProfile?: string | null
+  ) => {
+    const displayProfile =
+      profile && subProfile
+        ? `${profile} / ${subProfile}`
+        : profile || undefined;
+    setActiveToast({ exerciseName, profile: displayProfile });
     setTimeout(() => {
       setActiveToast(null);
     }, 2200);
@@ -188,7 +196,9 @@ export const App: React.FC = () => {
           {currentScreen === 'log' && (
             <WorkoutForm
               profiles={profiles}
+              subProfiles={subProfiles}
               onCreateProfile={createProfile}
+              onCreateSubProfile={createSubProfile}
               onAddWorkout={addWorkout}
               onWorkoutLogged={handleWorkoutLogged}
               onBack={handleGoHome}
