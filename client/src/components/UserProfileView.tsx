@@ -17,11 +17,23 @@ import {
   PanelTop,
   PanelLeft,
   Sliders,
+  CheckSquare,
+  Square,
+  RotateCcw,
+  Target,
 } from 'lucide-react';
 import { Workout } from '../types/workout';
 import { UserProfileData, UserSocials } from '../types/user';
 import { NavPosition } from './Header';
 import { formatSpelledDate } from '../utils/dateUtils';
+import {
+  AVAILABLE_METRICS,
+  DEFAULT_DISPLAY_PREFERENCES,
+  loadProfileDisplayPreferences,
+  saveProfileDisplayPreferences,
+  ProfileDisplayPreferences,
+  MetricDefinition,
+} from '../utils/profileMetrics';
 
 interface UserProfileViewProps {
   workouts: Workout[];
@@ -100,6 +112,75 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Display Preferences for Profile Stats
+  const [displayPreferences, setDisplayPreferences] = useState<ProfileDisplayPreferences>(() =>
+    loadProfileDisplayPreferences()
+  );
+  const [showCustomizer, setShowCustomizer] = useState(false);
+
+  // List of all unique exercises recorded by user
+  const uniqueExercisesList = useMemo(() => {
+    return Array.from(new Set(workouts.map((w) => w.exercise_name.trim())))
+      .filter(Boolean)
+      .sort();
+  }, [workouts]);
+
+  // Metrics Display Customizer Handlers
+  const toggleMetric = (id: string) => {
+    setDisplayPreferences((prev) => {
+      const exists = prev.selectedMetricIds.includes(id);
+      let nextIds: string[];
+      if (exists) {
+        if (prev.selectedMetricIds.length <= 1) return prev; // Keep at least one metric visible
+        nextIds = prev.selectedMetricIds.filter((m) => m !== id);
+      } else {
+        nextIds = [...prev.selectedMetricIds, id];
+      }
+      const next = { ...prev, selectedMetricIds: nextIds };
+      saveProfileDisplayPreferences(next);
+      return next;
+    });
+  };
+
+  const handleSetPrExercise = (exerciseName: string) => {
+    setDisplayPreferences((prev) => {
+      const next = { ...prev, prExerciseName: exerciseName };
+      saveProfileDisplayPreferences(next);
+      return next;
+    });
+  };
+
+  const applyPreset = (ids: string[]) => {
+    setDisplayPreferences((prev) => {
+      const next = { ...prev, selectedMetricIds: ids };
+      saveProfileDisplayPreferences(next);
+      return next;
+    });
+  };
+
+  const resetMetrics = () => {
+    setDisplayPreferences(DEFAULT_DISPLAY_PREFERENCES);
+    saveProfileDisplayPreferences(DEFAULT_DISPLAY_PREFERENCES);
+  };
+
+  // Rendered active metric items
+  const renderedMetrics = useMemo(() => {
+    const effectivePrExercise =
+      displayPreferences.prExerciseName || uniqueExercisesList[0] || 'Bench Press';
+
+    return displayPreferences.selectedMetricIds
+      .map((id) => AVAILABLE_METRICS.find((m) => m.id === id))
+      .filter((m): m is MetricDefinition => Boolean(m))
+      .map((def) => {
+        const result = def.calculate(workouts, { prExerciseName: effectivePrExercise });
+        return {
+          def,
+          result,
+          effectivePrExercise,
+        };
+      });
+  }, [displayPreferences, workouts, uniqueExercisesList]);
 
   // Alerts & Messages
   const [profileSuccess, setProfileSuccess] = useState(false);
@@ -419,70 +500,199 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         </div>
       </div>
 
-      {/* SECTION 1: GENERAL PROGRESS OVERVIEW */}
+      {/* SECTION 1: PROFILE DASHBOARD & SELECTABLE METRICS */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between border-b border-[#383530]/60 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#383530]/60 pb-3 gap-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-[#CC6543]" />
             <h2 className="text-lg font-bold text-[#F5F2EB] uppercase tracking-wider">
-              General Progress & Lifetime Stats
+              Profile Dashboard & Stats
             </h2>
           </div>
-          <span className="text-xs text-[#A8A297]">
-            {analytics.totalSessions} Total Sessions
-          </span>
-        </div>
 
-        {/* 4-Card Analytics Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-[#252320]/80 border border-[#383530] rounded-2xl p-4 space-y-1">
-            <span className="text-[10px] uppercase tracking-widest text-[#A8A297] font-semibold block">
-              Lifetime Volume
-            </span>
-            <span className="text-2xl sm:text-3xl font-bold text-[#F5F2EB] block">
-              {analytics.totalVolumeKg >= 1000 ? `${analytics.totalVolumeTonnes} t` : `${analytics.totalVolumeKg} kg`}
-            </span>
-            <span className="text-[10px] text-[#706B62] block">
-              {analytics.totalVolumeKg.toLocaleString()} total kg
-            </span>
-          </div>
-
-          <div className="bg-[#252320]/80 border border-[#383530] rounded-2xl p-4 space-y-1">
-            <span className="text-[10px] uppercase tracking-widest text-[#A8A297] font-semibold block">
-              Peak Weight Lifted
-            </span>
-            <span className="text-2xl sm:text-3xl font-bold text-[#DE7C5A] block">
-              {analytics.maxWeight} kg
-            </span>
-            <span className="text-[10px] text-[#706B62] block">
-              All-time heaviest load
-            </span>
-          </div>
-
-          <div className="bg-[#252320]/80 border border-[#383530] rounded-2xl p-4 space-y-1">
-            <span className="text-[10px] uppercase tracking-widest text-[#A8A297] font-semibold block">
-              Total Volume Reps
-            </span>
-            <span className="text-2xl sm:text-3xl font-bold text-[#F5F2EB] block">
-              {analytics.totalReps.toLocaleString()}
-            </span>
-            <span className="text-[10px] text-[#706B62] block">
-              Across {analytics.totalSets} completed sets
-            </span>
-          </div>
-
-          <div className="bg-[#252320]/80 border border-[#383530] rounded-2xl p-4 space-y-1">
-            <span className="text-[10px] uppercase tracking-widest text-[#A8A297] font-semibold block">
-              Avg Effort (RIR)
-            </span>
-            <span className="text-2xl sm:text-3xl font-bold text-[#F5F2EB] block">
-              {analytics.avgRir}
-            </span>
-            <span className="text-[10px] text-[#706B62] block">
-              {analytics.uniqueExercises} unique exercises
-            </span>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setShowCustomizer(!showCustomizer)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95 ${
+                showCustomizer
+                  ? 'bg-[#CC6543] text-white shadow-md shadow-[#CC6543]/20'
+                  : 'bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white hover:border-[#CC6543]'
+              }`}
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>{showCustomizer ? 'Done Customizing' : 'Customize Stats'}</span>
+            </button>
           </div>
         </div>
+
+        {/* INTERACTIVE METRIC CUSTOMIZATION PANEL */}
+        {showCustomizer && (
+          <div className="bg-[#252320]/95 border border-[#CC6543]/50 rounded-2xl p-5 sm:p-6 space-y-6 animate-pop-in shadow-xl backdrop-blur-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#383530]">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Select What to Display on Your Profile
+                </h3>
+                <p className="text-xs text-[#A8A297] mt-0.5">
+                  Choose which precalculated metrics and PRs to showcase on your profile dashboard.
+                </p>
+              </div>
+
+              {/* Presets & Reset */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] uppercase font-bold text-[#706B62] tracking-wider">Presets:</span>
+                <button
+                  type="button"
+                  onClick={() => applyPreset(['exercise_pr', 'total_sessions', 'total_sets', 'avg_rir'])}
+                  className="px-2.5 py-1 rounded-lg bg-[#191816] border border-[#383530] hover:border-[#CC6543] text-[11px] font-medium text-[#F5F2EB] active:scale-95 transition"
+                >
+                  Strength Focus
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset(['current_streak', 'month_sessions', 'total_sessions', 'total_reps'])}
+                  className="px-2.5 py-1 rounded-lg bg-[#191816] border border-[#383530] hover:border-[#CC6543] text-[11px] font-medium text-[#F5F2EB] active:scale-95 transition"
+                >
+                  Consistency
+                </button>
+                <button
+                  type="button"
+                  onClick={resetMetrics}
+                  className="p-1.5 rounded-lg bg-[#191816] border border-[#383530] text-[#706B62] hover:text-[#CC6543] transition active:scale-95"
+                  title="Reset to defaults"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Exercise Selector for Specific Peak Weight / PR */}
+            {displayPreferences.selectedMetricIds.includes('exercise_pr') && (
+              <div className="bg-[#191816] border border-[#383530] rounded-xl p-3.5 space-y-2">
+                <label className="text-xs font-semibold text-[#CC6543] uppercase tracking-wider flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5" />
+                  <span>Choose Exercise for Peak Weight (PR) Highlight:</span>
+                </label>
+                {uniqueExercisesList.length > 0 ? (
+                  <select
+                    value={displayPreferences.prExerciseName || uniqueExercisesList[0]}
+                    onChange={(e) => handleSetPrExercise(e.target.value)}
+                    className="w-full sm:w-72 bg-[#252320] border border-[#383530] focus:border-[#CC6543] rounded-lg px-3 py-2 text-sm font-bold text-[#F5F2EB] focus:outline-none transition cursor-pointer"
+                  >
+                    {uniqueExercisesList.map((ex) => (
+                      <option key={ex} value={ex} className="bg-[#191816] text-[#F5F2EB]">
+                        {ex}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs text-[#706B62] italic">
+                    Log workouts first to choose from your recorded exercises.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Metric Options Grid with Checkboxes */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {AVAILABLE_METRICS.map((metric) => {
+                const isSelected = displayPreferences.selectedMetricIds.includes(metric.id);
+                return (
+                  <button
+                    key={metric.id}
+                    type="button"
+                    onClick={() => toggleMetric(metric.id)}
+                    className={`text-left p-3 rounded-xl border transition-all flex items-start gap-3 active:scale-[0.99] ${
+                      isSelected
+                        ? 'bg-[#CC6543]/15 border-[#CC6543] text-white shadow-sm'
+                        : 'bg-[#191816] border-[#383530] text-[#A8A297] hover:border-[#4D4740] hover:text-[#F5F2EB]'
+                    }`}
+                  >
+                    <div className="pt-0.5 shrink-0 text-[#CC6543]">
+                      {isSelected ? (
+                        <CheckSquare className="w-4 h-4 fill-[#CC6543] text-[#191816]" />
+                      ) : (
+                        <Square className="w-4 h-4 text-[#706B62]" />
+                      )}
+                    </div>
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-[#F5F2EB] block truncate">
+                          {metric.title}
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#252320] border border-[#383530] text-[#CC6543] shrink-0 font-medium">
+                          {metric.category}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#A8A297] leading-tight line-clamp-2">
+                        {metric.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* DYNAMIC METRICS CARDS GRID */}
+        {renderedMetrics.length === 0 ? (
+          <div className="bg-[#252320]/80 border border-[#383530] rounded-2xl p-8 text-center text-xs text-[#A8A297]">
+            No stats selected. Click "Customize Stats" above to choose what to display.
+          </div>
+        ) : (
+          <div
+            className={`grid gap-4 ${
+              renderedMetrics.length === 1
+                ? 'grid-cols-1 max-w-sm mx-auto'
+                : renderedMetrics.length === 2
+                ? 'grid-cols-1 sm:grid-cols-2'
+                : renderedMetrics.length === 3
+                ? 'grid-cols-1 sm:grid-cols-3'
+                : 'grid-cols-2 sm:grid-cols-4'
+            }`}
+          >
+            {renderedMetrics.map(({ def, result, effectivePrExercise }) => (
+              <div
+                key={def.id}
+                className={`bg-[#252320]/80 border rounded-2xl p-4 space-y-1 relative overflow-hidden transition-all hover:border-[#4D4740] ${
+                  result.highlight
+                    ? 'border-[#CC6543]/40 shadow-sm shadow-[#CC6543]/10'
+                    : 'border-[#383530]'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] uppercase tracking-widest text-[#A8A297] font-semibold block truncate">
+                    {def.id === 'exercise_pr' ? `${effectivePrExercise} PR` : def.title}
+                  </span>
+                  {def.id === 'exercise_pr' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomizer(true)}
+                      className="text-[9px] text-[#CC6543] hover:underline shrink-0"
+                      title="Change PR Exercise"
+                    >
+                      Change
+                    </button>
+                  )}
+                </div>
+
+                <span
+                  className={`text-2xl sm:text-3xl font-bold block tracking-tight ${
+                    result.highlight ? 'text-[#DE7C5A]' : 'text-[#F5F2EB]'
+                  }`}
+                >
+                  {result.value}
+                </span>
+
+                <span className="text-[10px] text-[#706B62] block truncate">
+                  {result.subtitle}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* SECTION 2: 35-DAY RECENT ACTIVITY GRID */}
