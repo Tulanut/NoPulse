@@ -20,6 +20,7 @@ export const App: React.FC = () => {
     profiles,
     createProfile,
     deleteProfile,
+    renameProfile,
     deleteExercise,
     bulkUpdateExerciseProfile,
     bulkDeleteExercises,
@@ -196,6 +197,7 @@ export const App: React.FC = () => {
               profiles={profiles}
               onCreateProfile={createProfile}
               onDeleteProfile={deleteProfile}
+              onRenameProfile={renameProfile}
               onDeleteExercise={deleteExercise}
               onBulkUpdateExerciseProfile={bulkUpdateExerciseProfile}
               onBulkDeleteExercises={bulkDeleteExercises}

@@ -130,6 +130,48 @@ export function useWorkouts() {
     [customProfiles, workouts, network.isOnline, refreshLocalWorkouts]
   );
 
+  // Rename a profile and migrate all associated workouts
+  const renameProfile = useCallback(
+    async (oldName: string, newName: string): Promise<boolean> => {
+      const trimmedOld = oldName.trim();
+      const trimmedNew = newName.trim();
+      if (!trimmedNew || trimmedOld === trimmedNew) return false;
+
+      // 1. Update custom profiles list
+      const nextCustomProfiles = customProfiles.map((p) =>
+        p.toLowerCase() === trimmedOld.toLowerCase() ? trimmedNew : p
+      );
+      if (!nextCustomProfiles.some((p) => p.toLowerCase() === trimmedNew.toLowerCase())) {
+        nextCustomProfiles.push(trimmedNew);
+      }
+      const uniqueProfiles = Array.from(new Set(nextCustomProfiles));
+      setCustomProfiles(uniqueProfiles);
+      await localDB.saveCustomProfiles(uniqueProfiles);
+
+      // 2. Migrate all workouts assigned to oldName
+      const matchingWorkouts = workouts.filter(
+        (w) => w.profile && w.profile.toLowerCase() === trimmedOld.toLowerCase()
+      );
+      for (const w of matchingWorkouts) {
+        await localDB.saveWorkout({
+          ...w,
+          profile: trimmedNew,
+          sync_status: 'pending',
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      await refreshLocalWorkouts();
+
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+
+      return true;
+    },
+    [customProfiles, workouts, network.isOnline, refreshLocalWorkouts]
+  );
+
   // Update profile for all entries of an exercise
   const updateExerciseProfile = useCallback(
     async (exerciseName: string, newProfile: string | null) => {
@@ -360,6 +402,7 @@ export function useWorkouts() {
     profiles,
     createProfile,
     deleteProfile,
+    renameProfile,
     deleteExercise,
     updateExerciseProfile,
     bulkUpdateExerciseProfile,

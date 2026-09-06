@@ -10,6 +10,8 @@ import {
   Square,
   FolderPlus,
   X,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import { Workout } from '../types/workout';
 import { formatSpelledDate } from '../utils/dateUtils';
@@ -19,6 +21,7 @@ interface ExerciseHubProps {
   profiles: string[];
   onCreateProfile: (name: string) => Promise<string>;
   onDeleteProfile?: (profileName: string) => Promise<void> | void;
+  onRenameProfile?: (oldName: string, newName: string) => Promise<boolean | void> | void;
   onDeleteExercise?: (exerciseName: string, profile?: string) => Promise<void> | void;
   onBulkUpdateExerciseProfile?: (exerciseNames: string[], newProfile: string | null) => Promise<void> | void;
   onBulkDeleteExercises?: (exerciseNames: string[]) => Promise<void> | void;
@@ -44,6 +47,7 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   profiles,
   onCreateProfile,
   onDeleteProfile,
+  onRenameProfile,
   onDeleteExercise,
   onBulkUpdateExerciseProfile,
   onBulkDeleteExercises,
@@ -54,6 +58,10 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [deleteConfirmProfile, setDeleteConfirmProfile] = useState<string | null>(null);
   const [deleteConfirmExercise, setDeleteConfirmExercise] = useState<string | null>(null);
+
+  // Profile Inline Rename State
+  const [editingProfile, setEditingProfile] = useState<string | null>(null);
+  const [editProfileName, setEditProfileName] = useState('');
 
   // Bulk Selection State
   const [isSelecting, setIsSelecting] = useState(false);
@@ -241,6 +249,43 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
       }
     }
     setDeleteConfirmProfile(null);
+  };
+
+  // Profile Rename Handlers
+  const handleStartRename = (e: React.MouseEvent, profileName: string) => {
+    e.stopPropagation();
+    setEditingProfile(profileName);
+    setEditProfileName(profileName);
+    setDeleteConfirmProfile(null);
+  };
+
+  const handleCancelRename = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingProfile(null);
+    setEditProfileName('');
+  };
+
+  const handleSaveRename = async (e?: React.FormEvent | React.MouseEvent, oldName?: string) => {
+    if (e) e.preventDefault();
+    if (e && 'stopPropagation' in e) e.stopPropagation();
+
+    const targetOld = oldName || editingProfile;
+    if (!targetOld) return;
+
+    const trimmed = editProfileName.trim();
+    if (!trimmed || trimmed.toLowerCase() === targetOld.toLowerCase()) {
+      handleCancelRename();
+      return;
+    }
+
+    if (onRenameProfile) {
+      await onRenameProfile(targetOld, trimmed);
+      if (activeProfile === targetOld) {
+        setActiveProfile(trimmed);
+      }
+    }
+
+    handleCancelRename();
   };
 
   const handleDeleteExerciseClick = (e: React.MouseEvent, exerciseName: string) => {
@@ -540,45 +585,95 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
 
         {/* Profile Header */}
         <div className="mb-8 pb-6 border-b border-[#383530]/50 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
-          <div>
+          <div className="flex-1">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#CC6543]/15 text-[#CC6543] flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-[#CC6543]/15 text-[#CC6543] flex items-center justify-center shrink-0">
                 <Folder className="w-5 h-5" />
               </div>
-              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-[#F5F2EB]">
-                {activeProfile}
-              </h1>
 
-              {/* Profile Delete in Drilldown Header */}
-              {onDeleteProfile && (
-                deleteConfirmProfile === activeProfile ? (
-                  <div className="flex items-center gap-2 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-3 py-1 rounded-full animate-pop-in ml-2">
-                    <span className="text-[11px] text-[#F5B5B5] font-semibold">Delete Profile?</span>
+              {editingProfile === activeProfile ? (
+                <form
+                  onSubmit={(e) => handleSaveRename(e, activeProfile)}
+                  className="flex items-center gap-2 flex-wrap animate-pop-in flex-1"
+                >
+                  <input
+                    type="text"
+                    value={editProfileName}
+                    onChange={(e) => setEditProfileName(e.target.value)}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') handleCancelRename();
+                    }}
+                    className="bg-[#191816] border border-[#CC6543] rounded-xl px-3 py-1.5 text-2xl sm:text-4xl font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#CC6543] max-w-sm w-full"
+                    placeholder="Profile name..."
+                  />
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={(e) => handleConfirmDeleteProfile(e, activeProfile)}
-                      className="text-[11px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                      type="submit"
+                      className="p-2 rounded-xl bg-[#CC6543] hover:bg-[#DE7C5A] text-white transition active:scale-95 shadow-md shadow-[#CC6543]/25"
+                      title="Save profile name"
                     >
-                      Confirm
+                      <Check className="w-4 h-4 stroke-[3]" />
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteConfirmProfile(null);
-                      }}
-                      className="text-[11px] text-[#A8A297] hover:text-white"
+                      type="button"
+                      onClick={() => handleCancelRename()}
+                      className="p-2 rounded-xl bg-[#252320] border border-[#383530] text-[#A8A297] hover:text-white transition active:scale-95"
+                      title="Cancel"
                     >
-                      Cancel
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
-                ) : (
-                  <button
-                    onClick={(e) => handleDeleteProfileClick(e, activeProfile)}
-                    className="p-1.5 rounded-lg text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors ml-1"
-                    title={`Delete "${activeProfile}" profile`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )
+                </form>
+              ) : (
+                <div className="flex items-center gap-2.5 group/title flex-wrap">
+                  <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-[#F5F2EB]">
+                    {activeProfile}
+                  </h1>
+
+                  {/* Profile Rename Button */}
+                  {onRenameProfile && (
+                    <button
+                      onClick={(e) => handleStartRename(e, activeProfile)}
+                      className="p-1.5 rounded-lg text-[#706B62] hover:text-[#CC6543] hover:bg-[#2E2B27] transition-all opacity-80 group-hover/title:opacity-100"
+                      title={`Rename "${activeProfile}" profile`}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {/* Profile Delete in Drilldown Header */}
+                  {onDeleteProfile && (
+                    deleteConfirmProfile === activeProfile ? (
+                      <div className="flex items-center gap-2 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-3 py-1 rounded-full animate-pop-in ml-1">
+                        <span className="text-[11px] text-[#F5B5B5] font-semibold">Delete Profile?</span>
+                        <button
+                          onClick={(e) => handleConfirmDeleteProfile(e, activeProfile)}
+                          className="text-[11px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmProfile(null);
+                          }}
+                          className="text-[11px] text-[#A8A297] hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => handleDeleteProfileClick(e, activeProfile)}
+                        className="p-1.5 rounded-lg text-[#706B62] hover:text-[#D45B5B] hover:bg-[#D45B5B]/10 transition-colors ml-1"
+                        title={`Delete "${activeProfile}" profile`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )
+                  )}
+                </div>
               )}
             </div>
 
@@ -751,25 +846,73 @@ export const ExerciseHub: React.FC<ExerciseHubProps> = ({
                   <div className="w-10 h-10 rounded-xl bg-[#CC6543]/15 text-[#CC6543] group-hover:bg-[#CC6543] group-hover:text-white flex items-center justify-center transition-all shrink-0">
                     <Folder className="w-5 h-5" />
                   </div>
-                  <div className="truncate">
-                    <h3 className="text-xl font-bold text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors truncate">
-                      {p.name}
-                    </h3>
-                    <p className="text-xs text-[#A8A297] mt-0.5">
-                      {p.uniqueExercises} {p.uniqueExercises === 1 ? 'exercise' : 'exercises'} · {p.totalLogs} {p.totalLogs === 1 ? 'session' : 'sessions'}
-                    </p>
-                  </div>
+
+                  {editingProfile === p.name ? (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 flex-1 min-w-0 animate-pop-in mr-1"
+                    >
+                      <input
+                        type="text"
+                        value={editProfileName}
+                        onChange={(e) => setEditProfileName(e.target.value)}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveRename(e, p.name);
+                          if (e.key === 'Escape') handleCancelRename();
+                        }}
+                        className="w-full bg-[#191816] border border-[#CC6543] rounded-lg px-2.5 py-1 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#CC6543]"
+                        placeholder="Profile name..."
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => handleSaveRename(e, p.name)}
+                        className="p-1.5 rounded-lg bg-[#CC6543] hover:bg-[#DE7C5A] text-white shrink-0 active:scale-95 transition"
+                        title="Save name"
+                      >
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelRename}
+                        className="p-1.5 rounded-lg bg-[#191816] border border-[#383530] text-[#A8A297] hover:text-white shrink-0 active:scale-95 transition"
+                        title="Cancel"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="truncate">
+                      <h3 className="text-xl font-bold text-[#F5F2EB] group-hover:text-[#DE7C5A] transition-colors truncate">
+                        {p.name}
+                      </h3>
+                      <p className="text-xs text-[#A8A297] mt-0.5">
+                        {p.uniqueExercises} {p.uniqueExercises === 1 ? 'exercise' : 'exercises'} · {p.totalLogs} {p.totalLogs === 1 ? 'session' : 'sessions'}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Right controls: Delete Profile + Arrow */}
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Right controls: Rename Profile + Delete Profile + Arrow */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {onRenameProfile && editingProfile !== p.name && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleStartRename(e, p.name)}
+                      className="p-1.5 rounded-lg text-[#706B62] hover:text-[#CC6543] hover:bg-[#CC6543]/10 transition-colors opacity-70 group-hover:opacity-100"
+                      title={`Rename "${p.name}" profile`}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+
                   {onDeleteProfile && (
                     deleteConfirmProfile === p.name ? (
                       <div
                         onClick={(e) => e.stopPropagation()}
                         className="flex items-center gap-1.5 bg-[#D45B5B]/15 border border-[#D45B5B]/30 px-2 py-1 rounded-full animate-pop-in"
                       >
-                        <span className="text-[10px] text-[#F5B5B5]">Delete?</span>
+                        <span className="text-[10px] text-[#F5F2EB]">Delete?</span>
                         <button
                           onClick={(e) => handleConfirmDeleteProfile(e, p.name)}
                           className="text-[10px] text-[#D45B5B] hover:text-red-400 font-bold uppercase underline"
