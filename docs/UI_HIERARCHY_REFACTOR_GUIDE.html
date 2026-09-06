@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UI Hierarchy & Design Symmetry Playbook — Junior SWE Guide</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --text-muted: #8b949e;
+      --primary: #58a6ff;
+      --accent: #CC6543;
+      --accent-hover: #DE7C5A;
+      --success: #3fb950;
+      --warning: #d29922;
+      --code-bg: #1f242c;
+      --pre-bg: #0b0e14;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #ffffff;
+        --surface: #f6f8fa;
+        --border: #d0d7de;
+        --text: #24292f;
+        --text-bright: #1f2328;
+        --text-muted: #57606a;
+        --primary: #0969da;
+        --accent: #CC6543;
+        --accent-hover: #b85232;
+        --success: #1a7f37;
+        --warning: #9a6700;
+        --code-bg: #eaeef2;
+        --pre-bg: #f6f8fa;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #111827 !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      pre {
+        background: #f3f4f6 !important;
+        color: #111827 !important;
+        border: 1px solid #e5e7eb !important;
+        page-break-inside: avoid;
+      }
+      table {
+        page-break-inside: avoid;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.68;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 940px;
+      margin: 0 auto;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(204, 101, 67, 0.15), rgba(88, 166, 255, 0.12));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 2.1rem;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+      line-height: 1.25;
+    }
+
+    .subtitle {
+      font-size: 1.12rem;
+      color: var(--accent);
+      font-style: italic;
+      margin-bottom: 16px;
+    }
+
+    .target-badge {
+      display: inline-block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      color: var(--primary);
+    }
+
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 10px 18px;
+      background-color: var(--accent);
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+      font-size: 0.9rem;
+      transition: background-color 0.2s;
+    }
+
+    .download-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    h2 {
+      font-size: 1.55rem;
+      color: var(--text-bright);
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      color: var(--text-bright);
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    p {
+      margin-bottom: 16px;
+    }
+
+    ul, ol {
+      margin-bottom: 16px;
+      padding-left: 24px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+      font-size: 0.88em;
+      background-color: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-bright);
+    }
+
+    pre {
+      background-color: var(--pre-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin-bottom: 20px;
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background-color: transparent;
+      padding: 0;
+      color: var(--text);
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .card-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .card-bad {
+      border-left: 4px solid #f85149;
+    }
+
+    .card-good {
+      border-left: 4px solid var(--success);
+    }
+
+    .card-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 1.05rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    th {
+      background-color: var(--surface);
+      color: var(--text-bright);
+    }
+
+    .callout {
+      background-color: var(--surface);
+      border-left: 4px solid var(--accent);
+      padding: 16px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 20px;
+    }
+
+    .badge-stage {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background-color: rgba(204, 101, 67, 0.18);
+      color: var(--accent);
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-banner">
+      <h1>UI Hierarchy & Design Symmetry Playbook</h1>
+      <div class="subtitle">How to Methodically Refactor Nested UI Components to Match Existing Design Systems Without Mess, Regressions, or Confusion</div>
+      <div class="target-badge">Target: Junior Software Engineers & Full-Stack Developers</div>
+      <br>
+      <button class="download-btn no-print" onclick="window.print()">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/><path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z"/></svg>
+        Print / Save as PDF
+      </button>
+    </div>
+
+    <!-- Section 1 -->
+    <h2>1. The Challenge: "Make Feature X Look Exactly Like Page Y"</h2>
+    <p>In commercial software development, an employer, product manager, or lead designer will frequently hand you this requirement:</p>
+    <div class="callout">
+      <strong>Real-World Request:</strong><br>
+      <em>"The sub-folder horizontal chip toolbar we built feels cramped and confusing. Redesign sub-folders so they look and behave the <strong>exact same way</strong> as workout profile cards on the front page. Keep it minimalistic, familiar, and clean."</em>
+    </div>
+    <p>To an inexperienced developer, this sounds deceptively simple: <em>"Just change the styling."</em> But turning a horizontal filter bar into a <strong>hierarchical card grid with drilldown levels</strong> fundamentally alters:</p>
+    <ul>
+      <li><strong>View States:</strong> Expanding the screen from 2 visual tiers to 3 distinct depth levels.</li>
+      <li><strong>Search Scoping:</strong> Determining whether search filters the entire profile or just the active sub-folder.</li>
+      <li><strong>Drop Targets:</strong> Defining where an exercise moves when dropped on cards versus back buttons.</li>
+      <li><strong>State Cleanup:</strong> Resetting selections, searches, and drilldowns safely upon back navigation or deletion.</li>
+      <li><strong>Mobile Parity:</strong> Preserving touch-friendly drag haptics, sticky drop trays, and 1-tap sheet modals.</li>
+    </ul>
+
+    <!-- Section 2 -->
+    <h2>2. The Mindset Shift: Newbie Chaos vs. Senior Method</h2>
+    <div class="card-grid">
+      <div class="card card-bad">
+        <div class="card-title" style="color: #f85149;">❌ The Newbie Anti-Pattern</div>
+        <p><strong>Ad-hoc Copy-Paste & Fragmented State:</strong></p>
+        <ul>
+          <li>Copies JSX blocks blindly from the front page without understanding underlying data dependencies.</li>
+          <li>Nests ternary operators (<code>? : ? :</code>) 4 levels deep, creating unmaintainable JSX and brace-matching compile errors.</li>
+          <li>Calculates counts inline inside loops, causing re-render lag.</li>
+          <li>Slightly alters Tailwind classes, resulting in mismatched padding, borders, and an amateurish feel.</li>
+        </ul>
+      </div>
+
+      <div class="card card-good">
+        <div class="card-title" style="color: var(--success);">✅ The Senior Discipline</div>
+        <p><strong>Data Symmetry & Finite State Drilldowns:</strong></p>
+        <ul>
+          <li><strong>Data Symmetry:</strong> Mirrors the front page card model (<code>subProfileCards</code> derived with identical fields to <code>profileCards</code>).</li>
+          <li><strong>FSM Early Returns:</strong> Separates views cleanly using early returns instead of nested ternaries.</li>
+          <li><strong>Predictable DND:</strong> Treats every card and back button as a bidirectional state transition.</li>
+          <li><strong>Compile-First Rhythm:</strong> Verifies TypeScript compilation (<code>tsc -b</code>) after each structural modification.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Section 3 -->
+    <h2>3. The 3-Tier Hierarchical Mental Model</h2>
+    <p>A methodical frontend engineer views multi-level drilldowns as a <strong>Finite State Machine (FSM)</strong> with 3 distinct tiers:</p>
+
+    <pre><code>========================================================================================
+[ Tier 0: Global Exercises Hub ]  (activeProfile === null)
+  ├── Global Header (Exercises title, global search, bulk select)
+  ├── WORKOUT PROFILE CARDS GRID (2-column: Armwrestling, Push, Pull...)
+  └── General / Uncategorized Exercises List
+       │
+       ▼ (User clicks a Profile Card -> setActiveProfile("Armwrestling"))
+========================================================================================
+[ Tier 1: Profile Root View ]  (activeProfile !== null && activeSubProfile === null)
+  ├── "← Back to Exercises" Button (Drop target to remove exercise back to General)
+  ├── Profile Header (Editable title, delete profile, profile-wide search)
+  ├── SUB-FOLDERS CARDS GRID (Exact same 2-column card design: Sleep Day, Heavy Day...)
+  │    └── "+ New Sub-Folder" inline form
+  └── General Exercises in this Profile
+       │
+       ▼ (User clicks a Sub-Folder Card -> setActiveSubProfile("Sleep Day"))
+========================================================================================
+[ Tier 2: Sub-Folder Drilldown View ]  (activeProfile !== null && activeSubProfile !== null)
+  ├── "← Back to Armwrestling" Button (Drop target to remove exercise back to Profile Root)
+  ├── Sub-Folder Header (Editable sub-folder title, delete sub-folder, scoped search)
+  └── Exercises in this Sub-Folder List
+========================================================================================</code></pre>
+
+    <h3>The Drag-and-Drop Mutation Matrix</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Current Tier</th>
+          <th>Dragged Item</th>
+          <th>Drop Target</th>
+          <th>State Mutation Triggered</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Tier 0 (Front Page)</strong></td>
+          <td>Any Exercise</td>
+          <td>Profile Card <code>[X]</code></td>
+          <td><code>onBulkUpdateExerciseProfile([item], "X")</code></td>
+        </tr>
+        <tr>
+          <td><strong>Tier 1 (Profile Root)</strong></td>
+          <td>Profile Exercise</td>
+          <td>Sub-Folder Card <code>[Y]</code></td>
+          <td><code>onUpdateExerciseSubProfile(item, activeProfile, "Y")</code></td>
+        </tr>
+        <tr>
+          <td><strong>Tier 1 (Profile Root)</strong></td>
+          <td>Profile Exercise</td>
+          <td><code>← Back to Exercises</code> Button</td>
+          <td><code>onBulkUpdateExerciseProfile([item], null)</code> <em>(Reverts to General)</em></td>
+        </tr>
+        <tr>
+          <td><strong>Tier 2 (Sub-Folder)</strong></td>
+          <td>Sub-Folder Exercise</td>
+          <td><code>← Back to {Profile}</code> Button</td>
+          <td><code>onUpdateExerciseSubProfile(item, activeProfile, null)</code> <em>(Reverts to Profile Root)</em></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 4 -->
+    <h2>4. Step-by-Step Implementation Flow (The Exact Sequence)</h2>
+
+    <h3><span class="badge-stage">Step 1</span> Symmetry in Data Derivation (<code>useMemo</code> Cards)</h3>
+    <p>Before writing a single line of JSX, derive a symmetric data structure. If Tier 0 derives <code>profileCards</code>, Tier 1 must derive <code>subProfileCards</code> with the exact same interface:</p>
+    <pre><code>// client/src/components/ExerciseHub.tsx
+const subProfileCards = useMemo(() => {
+  if (!activeProfile) return [];
+  const subMap = new Map&lt;string, { count: number; exerciseSet: Set&lt;string&gt; }&gt;();
+
+  // 1. Seed with known sub-profiles (Guarantees empty folders still render!)
+  currentSubProfiles.forEach((s) =&gt; {
+    subMap.set(s, { count: 0, exerciseSet: new Set() });
+  });
+
+  // 2. Aggregate logs and unique exercise names
+  activeProfileWorkouts.forEach((w) =&gt; {
+    if (w.sub_profile) {
+      if (!subMap.has(w.sub_profile)) {
+        subMap.set(w.sub_profile, { count: 0, exerciseSet: new Set() });
+      }
+      const entry = subMap.get(w.sub_profile)!;
+      entry.count++;
+      entry.exerciseSet.add(w.exercise);
+    }
+  });
+
+  // 3. Normalize into uniform card objects
+  return Array.from(subMap.entries()).map(([name, data]) =&gt; ({
+    name,
+    totalLogs: data.count,
+    uniqueExercises: data.exerciseSet.size,
+  }));
+}, [activeProfile, currentSubProfiles, activeProfileWorkouts]);</code></pre>
+
+    <h3><span class="badge-stage">Step 2</span> Scoping Search & Exercise Filtering Across Tiers</h3>
+    <p>Search ambiguity frustrates users. Build predictable search scoping into <code>currentSummaries</code>:</p>
+    <pre><code>const currentSummaries = useMemo(() =&gt; {
+  if (activeProfile) {
+    // Tier 2: Drilled into Sub-Folder -> Strict filter
+    if (activeSubProfile) {
+      const filtered = activeProfileWorkouts.filter(
+        (w) =&gt; w.sub_profile?.toLowerCase() === activeSubProfile.toLowerCase()
+      );
+      return sortWithCustomOrder(groupExercises(filtered));
+    }
+
+    // Tier 1: At Profile Root WITH Search -> Search across ENTIRE profile
+    if (searchQuery.trim()) {
+      return sortWithCustomOrder(groupExercises(activeProfileWorkouts));
+    }
+
+    // Tier 1: At Profile Root WITHOUT Search -> Show only root exercises
+    const rootExercises = activeProfileWorkouts.filter((w) =&gt; !w.sub_profile);
+    return sortWithCustomOrder(groupExercises(rootExercises));
+  }
+
+  // Tier 0: Front Page -> Uncategorized exercises
+  const list = profileCards.length &gt; 0 ? uncategorizedWorkouts : workouts;
+  return sortWithCustomOrder(groupExercises(list));
+}, [activeProfile, activeSubProfile, activeProfileWorkouts, searchQuery, profileCards.length, uncategorizedWorkouts, workouts, customOrder]);</code></pre>
+
+    <h3><span class="badge-stage">Step 3</span> View Orchestration & Drilldown Routing (FSM Architecture)</h3>
+    <p>Replace massive nested ternaries with <strong>early returns</strong>:</p>
+    <pre><code>// VIEW 1: INSIDE A WORKOUT PROFILE
+if (activeProfile) {
+  // SUB-VIEW 1B: DRILLDOWN INTO A SUB-FOLDER (Tier 2)
+  if (activeSubProfile) {
+    return (
+      &lt;div className="subfolder-drilldown space-y-10"&gt;
+        {/* Back Button -> setActiveSubProfile(null) */}
+        {/* Sub-Folder Header (Editable name, delete confirmation) */}
+        {/* Exercises List in Sub-Folder */}
+        {renderBulkActionBar()}
+      &lt;/div&gt;
+    );
+  }
+
+  // SUB-VIEW 1A: PROFILE ROOT (Tier 1)
+  return (
+    &lt;div className="profile-root space-y-10"&gt;
+      {/* Back Button -> setActiveProfile(null) */}
+      {/* Profile Header */}
+      {/* SUB-FOLDERS CARDS GRID (Mirrors front page) */}
+      {/* GENERAL EXERCISES LIST */}
+      {renderBulkActionBar()}
+    &lt;/div&gt;
+  );
+}
+
+// VIEW 2: GLOBAL EXERCISE HUB (Tier 0)
+return (
+  &lt;div className="global-hub space-y-10"&gt;
+    {/* Global Header */}
+    {/* WORKOUT PROFILE CARDS GRID */}
+    {/* General Exercises List */}
+    {renderBulkActionBar()}
+  &lt;/div&gt;
+);</code></pre>
+
+    <h3><span class="badge-stage">Step 4</span> Card Component Symmetrization (Design Tokens)</h3>
+    <p>Strictly replicate the Tailwind classes from the front page profile cards:</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Element</th>
+          <th>Exact Tailwind Tokens</th>
+          <th>Design Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Card Container</strong></td>
+          <td><code>p-5 rounded-2xl bg-[#252320]/80 border border-[#383530] hover:border-[#CC6543] hover:bg-[#252320] transition-all group flex items-center justify-between cursor-pointer</code></td>
+          <td>Identical rounded corners, subtle surface elevation, and warm orange border glow.</td>
+        </tr>
+        <tr>
+          <td><strong>Folder Badge</strong></td>
+          <td><code>w-10 h-10 rounded-xl bg-[#CC6543]/15 text-[#CC6543] group-hover:bg-[#CC6543] group-hover:text-white flex items-center justify-center shrink-0</code></td>
+          <td>High-contrast visual anchor with hover color inversion.</td>
+        </tr>
+        <tr>
+          <td><strong>Card Title</strong></td>
+          <td><code>text-xl font-bold text-[#F5F2EB] group-hover:text-[#DE7C5A] truncate</code></td>
+          <td>Bold typographic hierarchy that prevents card overflow on long names.</td>
+        </tr>
+        <tr>
+          <td><strong>Metadata Text</strong></td>
+          <td><code>text-xs text-[#A8A297] mt-0.5</code></td>
+          <td>Clean metadata presentation (<code>{X} exercises · {Y} sessions</code>).</td>
+        </tr>
+        <tr>
+          <td><strong>Directional Arrow</strong></td>
+          <td><code>w-8 h-8 rounded-full border border-[#383530] group-hover:border-[#CC6543] group-hover:bg-[#CC6543]/10 flex items-center justify-center text-[#A8A297] group-hover:text-[#DE7C5A]</code></td>
+          <td>Universal visual affordance communicating click-to-drilldown.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3><span class="badge-stage">Step 5</span> Drag-and-Drop Drop-Target Matrix</h3>
+    <p>Make cards and back buttons dual-purpose: clickable navigation links AND drag-and-drop drop targets.</p>
+    <pre><code>&lt;!-- Back Button that removes an exercise from a sub-folder when dropped on it --&gt;
+&lt;button
+  onClick={() =&gt; setActiveSubProfile(null)}
+  data-subprofile-drop="__none__"
+  onDragOver={(e) =&gt; {
+    e.preventDefault();
+    setDragOverSubProfile('__none__');
+  }}
+  onDrop={async (e) =&gt; {
+    e.preventDefault();
+    const exercise = e.dataTransfer.getData('text/plain') || draggingExercise;
+    if (exercise && onUpdateExerciseSubProfile && activeProfile) {
+      await onUpdateExerciseSubProfile(exercise, activeProfile, null);
+      setDragFeedbackMessage(`Removed "${exercise}" from "${activeSubProfile}"`);
+    }
+    setDraggingExercise(null);
+  }}
+&gt;
+  &lt;ArrowLeft className="w-4 h-4" /&gt;
+  &lt;span&gt;{draggingExercise ? `📥 Drop here to move back to ${activeProfile}` : `Back to ${activeProfile}`}&lt;/span&gt;
+&lt;/button&gt;</code></pre>
+
+    <!-- Section 5 -->
+    <h2>5. The Symmetrization Blueprint (Side-by-Side Comparison)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>Front Page (Workout Profiles)</th>
+          <th>Profile View (Sub-Folders)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Card Grid Layout</strong></td>
+          <td><code>grid grid-cols-1 sm:grid-cols-2 gap-4</code></td>
+          <td><code>grid grid-cols-1 sm:grid-cols-2 gap-4</code></td>
+        </tr>
+        <tr>
+          <td><strong>Drop Target Key</strong></td>
+          <td><code>data-profile-drop={profileName}</code></td>
+          <td><code>data-subprofile-drop={subProfileName}</code></td>
+        </tr>
+        <tr>
+          <td><strong>Inline Rename</strong></td>
+          <td>Pencil icon &rarr; inline form &rarr; <code>handleStartRename</code></td>
+          <td>Pencil icon &rarr; inline form &rarr; <code>handleStartRenameSubProfile</code></td>
+        </tr>
+        <tr>
+          <td><strong>Inline Delete</strong></td>
+          <td>Trash icon &rarr; affirmative <code>Delete? Yes / No</code> badge</td>
+          <td>Trash icon &rarr; affirmative <code>Delete? Yes / No</code> badge</td>
+        </tr>
+        <tr>
+          <td><strong>Mobile 1-Tap Sheet</strong></td>
+          <td>Tapping <code>FolderPlus</code> opens Profile Picker modal</td>
+          <td>Tapping <code>FolderPlus</code> opens Sub-Profile Picker modal</td>
+        </tr>
+        <tr>
+          <td><strong>Drilldown Trigger</strong></td>
+          <td><code>setActiveProfile(profileName)</code></td>
+          <td><code>setActiveSubProfile(subProfileName)</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 6 -->
+    <h2>6. Universal Refactoring Checklist for Junior Engineers</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Area</th>
+          <th>Checklist Item</th>
+          <th>Critical Question to Ask Yourself</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>1</strong></td>
+          <td>Data Model</td>
+          <td>Derive cards in a dedicated <code>useMemo</code></td>
+          <td><em>Does an empty folder still render before exercises are added?</em></td>
+        </tr>
+        <tr>
+          <td><strong>2</strong></td>
+          <td>FSM Routing</td>
+          <td>Separate tiers using clean early returns</td>
+          <td><em>Did I eliminate deeply nested ternary operators in JSX?</em></td>
+        </tr>
+        <tr>
+          <td><strong>3</strong></td>
+          <td>Tokens</td>
+          <td>Replicate exact Tailwind classes</td>
+          <td><em>Do padding, icons, borders, and hover states match 100%?</em></td>
+        </tr>
+        <tr>
+          <td><strong>4</strong></td>
+          <td>Search</td>
+          <td>Implement tier-aware search scoping</td>
+          <td><em>Can a user find an exercise regardless of which folder it is in?</em></td>
+        </tr>
+        <tr>
+          <td><strong>5</strong></td>
+          <td>Desktop DND</td>
+          <td>Add HTML5 drag/drop listeners to cards</td>
+          <td><em>Does dropping on a card update the exercise record immediately?</em></td>
+        </tr>
+        <tr>
+          <td><strong>6</strong></td>
+          <td>Back Target</td>
+          <td>Make back buttons dual-purpose drop targets</td>
+          <td><em>Can the user easily drag an item backward out of a folder?</em></td>
+        </tr>
+        <tr>
+          <td><strong>7</strong></td>
+          <td>Mobile Touch</td>
+          <td>Preserve touch listeners & sticky tray</td>
+          <td><em>Does touch dragging on mobile summon the sticky drop tray?</em></td>
+        </tr>
+        <tr>
+          <td><strong>8</strong></td>
+          <td>Mobile Fallback</td>
+          <td>Provide 1-tap bottom sheet modal</td>
+          <td><em>Can a user without drag capability assign folders with 1 tap?</em></td>
+        </tr>
+        <tr>
+          <td><strong>9</strong></td>
+          <td>Cleanup</td>
+          <td>Reset state on back navigation</td>
+          <td><em>Did I clear search queries and selection mode when exiting?</em></td>
+        </tr>
+        <tr>
+          <td><strong>10</strong></td>
+          <td>Build Safety</td>
+          <td>Run <code>tsc -b && vite build</code></td>
+          <td><em>Does the compiler pass with 0 errors and 0 warnings?</em></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 7 -->
+    <h2>7. Common Traps That Break UI Refactors</h2>
+    <div class="card-bad card" style="margin-bottom: 16px;">
+      <div class="card-title" style="color: #f85149;">Trap 1: The "Vanishing Empty Folder"</div>
+      <p>If you build your card list purely by looping over recorded workouts, newly created folders will not render until an exercise is added. Always seed your card array with the known list of custom folders first.</p>
+    </div>
+
+    <div class="card-bad card" style="margin-bottom: 16px;">
+      <div class="card-title" style="color: #f85149;">Trap 2: The Orphaned View State</div>
+      <p>If a user deletes a sub-folder while viewing its contents, the screen will attempt to render a non-existent entity. In your delete handler, always check <code>if (activeSubProfile === subName) setActiveSubProfile(null)</code>.</p>
+    </div>
+
+    <div class="card-bad card" style="margin-bottom: 16px;">
+      <div class="card-title" style="color: #f85149;">Trap 3: JSX Closing-Tag Cascades</div>
+      <p>Replacing large blocks of JSX often accidentally removes closing <code>&lt;/div&gt;</code> tags from parent containers. Always edit inside out, verify with <code>git diff</code>, and run <code>npm run build</code> immediately.</p>
+    </div>
+
+    <div style="margin-top: 48px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+      Document generated for NoPulse Project • UI Hierarchy & Design System Reference
+    </div>
+  </div>
+</body>
+</html>
