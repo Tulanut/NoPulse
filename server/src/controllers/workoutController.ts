@@ -139,6 +139,96 @@ export class WorkoutController {
     }
   }
 
+  public static async updateWorkout(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const existing = await db.getWorkoutById(id);
+
+      if (!existing) {
+        res.status(404).json({ success: false, error: 'Workout not found' });
+        return;
+      }
+
+      const {
+        exercise_name,
+        sets,
+        reps,
+        rir,
+        weight,
+        profile,
+        sub_profile,
+        date,
+        notes,
+      } = req.body;
+
+      const numSets = sets !== undefined ? parseInt(String(sets), 10) : existing.sets;
+      const numReps = reps !== undefined ? parseInt(String(reps), 10) : existing.reps;
+      const numRir = rir !== undefined ? parseInt(String(rir), 10) : existing.rir;
+      const numWeight =
+        weight !== undefined
+          ? weight === null || weight === ''
+            ? null
+            : parseFloat(String(weight))
+          : existing.weight;
+
+      if (isNaN(numSets) || numSets <= 0 || !Number.isInteger(numSets)) {
+        res.status(400).json({ success: false, error: 'Sets must be a positive integer' });
+        return;
+      }
+
+      if (isNaN(numReps) || numReps <= 0 || !Number.isInteger(numReps)) {
+        res.status(400).json({ success: false, error: 'Reps must be a positive integer' });
+        return;
+      }
+
+      if (isNaN(numRir) || numRir < 0) {
+        res.status(400).json({ success: false, error: 'RIR must be 0 or greater' });
+        return;
+      }
+
+      const cleanExerciseName = exercise_name ? String(exercise_name).trim() : existing.exercise_name;
+      const cleanProfile =
+        profile !== undefined
+          ? profile && String(profile).trim()
+            ? String(profile).trim()
+            : null
+          : existing.profile;
+      const cleanSubProfile =
+        sub_profile !== undefined
+          ? sub_profile && String(sub_profile).trim()
+            ? String(sub_profile).trim()
+            : null
+          : existing.sub_profile;
+      const workoutDate = date && !isNaN(Date.parse(date)) ? date : existing.date;
+      const cleanNotes = notes !== undefined ? (notes ? String(notes).trim() : null) : existing.notes;
+      const now = new Date().toISOString();
+
+      const updatedWorkout: Workout = {
+        ...existing,
+        exercise_name: cleanExerciseName,
+        sets: numSets,
+        reps: numReps,
+        rir: numRir,
+        weight: numWeight,
+        profile: cleanProfile,
+        sub_profile: cleanSubProfile,
+        date: workoutDate,
+        notes: cleanNotes,
+        updated_at: now,
+      };
+
+      await db.upsertWorkout(updatedWorkout);
+
+      res.status(200).json({
+        success: true,
+        data: updatedWorkout,
+      });
+    } catch (error: any) {
+      console.error('Error updating workout:', error);
+      res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+    }
+  }
+
   public static async deleteWorkout(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;

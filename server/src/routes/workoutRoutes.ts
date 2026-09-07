@@ -7,6 +7,7 @@ router.get('/health', WorkoutController.healthCheck);
 router.get('/workouts', WorkoutController.getWorkouts);
 router.post('/workouts', WorkoutController.createWorkout);
 router.post('/workouts/sync', WorkoutController.syncWorkouts);
+router.put('/workouts/:id', WorkoutController.updateWorkout);
 router.delete('/workouts/:id', WorkoutController.deleteWorkout);
 
 export default router;

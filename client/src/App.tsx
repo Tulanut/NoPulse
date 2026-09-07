@@ -35,6 +35,7 @@ export const App: React.FC = () => {
     pendingSyncCount,
     network,
     addWorkout,
+    updateWorkout,
     deleteWorkout,
     manualSync,
   } = useWorkouts();
@@ -235,10 +236,12 @@ export const App: React.FC = () => {
               exerciseName={selectedExercise}
               allWorkouts={allWorkouts}
               profiles={profiles}
+              subProfiles={subProfiles}
               onCreateProfile={createProfile}
               onBack={handleBackToExercises}
               onAddWorkout={addWorkout}
               onWorkoutLogged={handleWorkoutLogged}
+              onUpdateWorkout={updateWorkout}
               onDeleteWorkout={deleteWorkout}
             />
           )}

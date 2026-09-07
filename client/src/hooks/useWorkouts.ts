@@ -582,6 +582,98 @@ export function useWorkouts() {
     [customProfiles, customSubProfiles, network.isOnline, refreshLocalWorkouts]
   );
 
+  // Update an existing workout entry by ID
+  const updateWorkout = useCallback(
+    async (
+      id: string,
+      updates: Partial<{
+        exercise_name: string;
+        sets: number;
+        reps: number;
+        rir: number;
+        weight: number | null;
+        profile: string | null;
+        sub_profile: string | null;
+        date: string;
+        notes: string | null;
+      }>
+    ) => {
+      const existing = workouts.find((w) => w.id === id);
+      if (!existing) return null;
+
+      const now = new Date().toISOString();
+      const updatedWorkout: Workout = {
+        ...existing,
+        ...updates,
+        exercise_name:
+          updates.exercise_name !== undefined
+            ? updates.exercise_name.trim()
+            : existing.exercise_name,
+        sets: updates.sets !== undefined ? Number(updates.sets) : existing.sets,
+        reps: updates.reps !== undefined ? Number(updates.reps) : existing.reps,
+        rir: updates.rir !== undefined ? Number(updates.rir) : existing.rir,
+        weight: updates.weight !== undefined ? updates.weight : existing.weight,
+        profile:
+          updates.profile !== undefined
+            ? updates.profile
+              ? updates.profile.trim()
+              : null
+            : existing.profile,
+        sub_profile:
+          updates.sub_profile !== undefined
+            ? updates.sub_profile
+              ? updates.sub_profile.trim()
+              : null
+            : existing.sub_profile,
+        date: updates.date !== undefined ? updates.date : existing.date,
+        notes:
+          updates.notes !== undefined
+            ? updates.notes
+              ? updates.notes.trim()
+              : null
+            : existing.notes,
+        updated_at: now,
+        sync_status: 'pending',
+      };
+
+      // 1. If profile is new, register in customProfiles
+      if (updatedWorkout.profile && !customProfiles.includes(updatedWorkout.profile)) {
+        const nextProfiles = [...customProfiles, updatedWorkout.profile];
+        setCustomProfiles(nextProfiles);
+        await localDB.saveCustomProfiles(nextProfiles);
+      }
+
+      // 2. If sub_profile is new, register in customSubProfiles
+      if (updatedWorkout.profile && updatedWorkout.sub_profile) {
+        const currentSubs = customSubProfiles[updatedWorkout.profile] || [];
+        if (
+          !currentSubs.some(
+            (s) => s.toLowerCase() === updatedWorkout.sub_profile!.toLowerCase()
+          )
+        ) {
+          const nextSubs = {
+            ...customSubProfiles,
+            [updatedWorkout.profile]: [...currentSubs, updatedWorkout.sub_profile],
+          };
+          setCustomSubProfiles(nextSubs);
+          await localDB.saveCustomSubProfiles(nextSubs);
+        }
+      }
+
+      // 3. Save locally in IndexedDB
+      await localDB.saveWorkout(updatedWorkout);
+      await refreshLocalWorkouts();
+
+      // 4. Background sync if online
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+
+      return updatedWorkout;
+    },
+    [workouts, customProfiles, customSubProfiles, network.isOnline, refreshLocalWorkouts]
+  );
+
   // Delete a single workout entry by ID
   const deleteWorkout = useCallback(
     async (id: string) => {
@@ -697,6 +789,7 @@ export function useWorkouts() {
     setFilter,
     stats,
     addWorkout,
+    updateWorkout,
     deleteWorkout,
     manualSync,
     refreshLocalWorkouts,
