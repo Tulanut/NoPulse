@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Local-First Data Mutation & Inline Editing Playbook — Junior SWE Guide</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --text-muted: #8b949e;
+      --primary: #58a6ff;
+      --accent: #CC6543;
+      --accent-hover: #DE7C5A;
+      --success: #3fb950;
+      --warning: #d29922;
+      --danger: #f85149;
+      --code-bg: #1f242c;
+      --pre-bg: #0b0e14;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #ffffff;
+        --surface: #f6f8fa;
+        --border: #d0d7de;
+        --text: #24292f;
+        --text-bright: #1f2328;
+        --text-muted: #57606a;
+        --primary: #0969da;
+        --accent: #CC6543;
+        --accent-hover: #b85232;
+        --success: #1a7f37;
+        --warning: #9a6700;
+        --danger: #cf222e;
+        --code-bg: #eaeef2;
+        --pre-bg: #f6f8fa;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #111827 !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      pre {
+        background: #f3f4f6 !important;
+        color: #111827 !important;
+        border: 1px solid #e5e7eb !important;
+        page-break-inside: avoid;
+      }
+      table, .card {
+        page-break-inside: avoid;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.68;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 940px;
+      margin: 0 auto;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(204, 101, 67, 0.15), rgba(88, 166, 255, 0.12));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 2.1rem;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+      line-height: 1.25;
+    }
+
+    .subtitle {
+      font-size: 1.12rem;
+      color: var(--accent);
+      font-style: italic;
+      margin-bottom: 16px;
+    }
+
+    .target-badge {
+      display: inline-block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      color: var(--primary);
+    }
+
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 10px 18px;
+      background-color: var(--accent);
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+      font-size: 0.9rem;
+      transition: background-color 0.2s;
+    }
+
+    .download-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    h2 {
+      font-size: 1.55rem;
+      color: var(--text-bright);
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      color: var(--text-bright);
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    p {
+      margin-bottom: 16px;
+    }
+
+    ul, ol {
+      margin-bottom: 16px;
+      padding-left: 24px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+      font-size: 0.88em;
+      background-color: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-bright);
+    }
+
+    pre {
+      background-color: var(--pre-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin-bottom: 20px;
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background-color: transparent;
+      padding: 0;
+      color: var(--text);
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .card-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .card-bad {
+      border-left: 4px solid var(--danger);
+    }
+
+    .card-good {
+      border-left: 4px solid var(--success);
+    }
+
+    .card-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 1.05rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    th {
+      background-color: var(--surface);
+      color: var(--text-bright);
+    }
+
+    .callout {
+      background-color: var(--surface);
+      border-left: 4px solid var(--accent);
+      padding: 16px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 20px;
+    }
+
+    .callout-warning {
+      border-left-color: var(--warning);
+    }
+
+    .pipeline-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .step-number {
+      background-color: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 50%;
+      min-width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-title {
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 4px;
+    }
+
+    .flowchart-box {
+      background-color: var(--pre-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .flow-node {
+      display: inline-block;
+      padding: 8px 16px;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-weight: 600;
+      margin: 6px;
+      color: var(--text-bright);
+      font-size: 0.88rem;
+    }
+
+    .flow-arrow {
+      color: var(--accent);
+      font-weight: bold;
+      margin: 0 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-banner">
+      <h1>The Local-First Data Mutation & Inline Editing Playbook</h1>
+      <div class="subtitle">How to Methodically Add Edit & Weight Correction Capabilities to Historical Data Across an Offline-First Full-Stack App</div>
+      <div class="target-badge">Audience: Junior Software Engineers & Developers</div>
+      <div class="no-print">
+        <button class="download-btn" onclick="window.print()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Print Document / Save as PDF
+        </button>
+      </div>
+    </div>
+
+    <h2>1. The Challenge: Why "Just Make It Editable" is Deceptive</h2>
+    <p>In a real-world software engineering job, your manager or client will often say:</p>
+    <div class="callout">
+      <strong>Employer Request:</strong> "In the exercise history view, users sometimes type the wrong weight or reps. Allow them to edit existing logged workouts and change their weight."
+    </div>
+    <p>To an inexperienced developer, this sounds like a 5-minute task: add an edit button, open a JavaScript <code>prompt()</code>, and call <code>setState()</code>. But in a <strong>local-first, offline-capable production application</strong>, historical data mutations trigger a cascade across the entire system:</p>
+
+    <ul>
+      <li><strong>Derived Statistics Invalidation:</strong> An exercise displays a <em>Personal Record (PR) / Max Weight</em>, a <em>Total Reps</em> counter, and a <em>Volume Progression Chart</em>. Editing a workout from 3 weeks ago must recompute all these calculations instantly in the UI.</li>
+      <li><strong>Offline-First Resilience:</strong> If a user is in a gym basement without reception, edits must write immediately to <strong>IndexedDB</strong>, mark the record as <code>sync_status: 'pending'</code>, and update the <code>updated_at</code> timestamp so Last-Write-Wins synchronization works cleanly.</li>
+      <li><strong>Backend Contract & Validation:</strong> The server needs an idempotent <code>PUT /api/workouts/:id</code> endpoint that validates inputs (positive sets/reps, null vs. numeric weights) and safely updates the database.</li>
+      <li><strong>Mobile Ergonomics:</strong> Screen-blocking popups fight with the on-screen keyboard. A smooth, accessible <strong>inline edit card</strong> with <code>+2.5</code> / <code>-2.5</code> weight steppers provides a far superior user experience.</li>
+    </ul>
+
+    <h2>2. The Mental Model: Newbie Chaos vs. Senior Method</h2>
+    <div class="card-grid">
+      <div class="card card-bad">
+        <div class="card-title">❌ The Newbie Approach (Outside-In Chaos)</div>
+        <p><strong>1. Starts in the UI:</strong> Adds local <code>useState</code> in the leaf view component.</p>
+        <p><strong>2. Mutates State Directly:</strong> Sets <code>workout.weight = 80</code> in place, breaking React immutability.</p>
+        <p><strong>3. Skips Offline Storage:</strong> Edits vanish on page reload because IndexedDB was never notified.</p>
+        <p><strong>4. Skips Timestamps:</strong> Doesn't bump <code>updated_at</code>, causing the sync engine to overwrite the user's edits with older server data.</p>
+        <p><strong>5. Stale Graphs:</strong> Volume charts and PR badges stay stuck on old numbers.</p>
+      </div>
+      <div class="card card-good">
+        <div class="card-title">✅ The Senior Method (Inside-Out Discipline)</div>
+        <p><strong>1. API Contract First:</strong> Implements <code>PUT /api/workouts/:id</code> with input validation and timestamp bumping.</p>
+        <p><strong>2. State Engine & IDB:</strong> Writes <code>updateWorkout()</code> in <code>useWorkouts.ts</code>, saving to IndexedDB with <code>pending</code> status.</p>
+        <p><strong>3. Reactive Derivation:</strong> Leverages <code>useMemo</code> so all PRs and charts recalculate automatically.</p>
+        <p><strong>4. Dual-Mode UI:</strong> Builds a 1-tap quick weight click badge and a full inline card with steppers.</p>
+        <p><strong>5. Clean Builds:</strong> Verifies client and server compile with 0 TypeScript errors.</p>
+      </div>
+    </div>
+
+    <h2>3. The 6-Stage Mutation Pipeline</h2>
+    <div class="flowchart-box">
+      <span class="flow-node">1. Backend API (PUT)</span>
+      <span class="flow-arrow">➔</span>
+      <span class="flow-node">2. State Hook & IDB</span>
+      <span class="flow-arrow">➔</span>
+      <span class="flow-node">3. Reactive Invalidation</span>
+      <br><br>
+      <span class="flow-arrow">➔</span>
+      <span class="flow-node">4. Component Contract</span>
+      <span class="flow-arrow">➔</span>
+      <span class="flow-node">5. Dual-Mode UI/UX</span>
+      <span class="flow-arrow">➔</span>
+      <span class="flow-node">6. Type Verification</span>
+    </div>
+
+    <h2>4. Step-by-Step Implementation Breakdown</h2>
+
+    <div class="pipeline-step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <div class="step-title">Stage 1: The Backend Contract & Data Mutation API (Express + SQLite)</div>
+        <p>Never mutate data on the client without having an idempotent server endpoint ready to receive it. In <code>server/src/controllers/workoutController.ts</code>:</p>
+        <pre><code>static updateWorkout(req: Request, res: Response): void {
+  try {
+    const { id } = req.params;
+    const existing = db.getWorkoutById(id);
+    if (!existing) {
+      res.status(404).json({ error: 'Workout not found' });
+      return;
+    }
+
+    const { exercise, sets, reps, weight, fatigue, profile, sub_profile, date, notes } = req.body;
+
+    const parsedSets = sets !== undefined ? Number(sets) : existing.sets;
+    const parsedReps = reps !== undefined ? Number(reps) : existing.reps;
+    if (parsedSets < 1 || parsedReps < 1) {
+      res.status(400).json({ error: 'Sets and reps must be positive integers' });
+      return;
+    }
+
+    const parsedWeight = weight !== undefined
+      ? (weight === null || weight === '' ? null : Number(weight))
+      : existing.weight;
+
+    const updatedWorkout: Workout = {
+      ...existing,
+      exercise: exercise !== undefined ? String(exercise).trim() : existing.exercise,
+      sets: parsedSets,
+      reps: parsedReps,
+      weight: parsedWeight,
+      fatigue: fatigue !== undefined ? fatigue : existing.fatigue,
+      profile: profile !== undefined ? String(profile).trim() : existing.profile,
+      sub_profile: sub_profile !== undefined ? (sub_profile ? String(sub_profile).trim() : null) : existing.sub_profile,
+      date: date !== undefined ? String(date) : existing.date,
+      notes: notes !== undefined ? (notes ? String(notes) : null) : existing.notes,
+      updated_at: new Date().toISOString(), // CRITICAL: Bump timestamp for Last-Write-Wins sync
+    };
+
+    db.upsertWorkout(updatedWorkout);
+    res.json({ workout: updatedWorkout });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update workout' });
+  }
+}</code></pre>
+        <p>Mount the route in <code>server/src/routes/workoutRoutes.ts</code>:</p>
+        <pre><code>router.put('/workouts/:id', WorkoutController.updateWorkout);</code></pre>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <div class="step-title">Stage 2: Client State Engine & Offline Sync Queue (useWorkouts.ts)</div>
+        <p>The UI component should never talk to the network directly. Instead, delegate to the state hook to update in-memory state and the offline database atomically:</p>
+        <pre><code>const updateWorkout = useCallback(
+  async (id: string, updates: Partial&lt;Omit&lt;Workout, 'id' | 'created_at'&gt;&gt;) => {
+    try {
+      const existing = workouts.find((w) => w.id === id);
+      if (!existing) throw new Error(`Workout with id ${id} not found`);
+
+      const updatedRecord: Workout = {
+        ...existing,
+        ...updates,
+        updated_at: new Date().toISOString(),
+        sync_status: 'pending', // Marks for background sync
+      };
+
+      // 1. Optimistic in-memory update
+      setWorkouts((prev) => prev.map((w) => (w.id === id ? updatedRecord : w)));
+
+      // 2. Persist to browser IndexedDB
+      await localDB.saveWorkout(updatedRecord);
+
+      // 3. Register any new profile or sub-profile
+      if (updates.profile && !profiles.includes(updates.profile)) {
+        await addProfile(updates.profile);
+      }
+      if (updates.profile && updates.sub_profile) {
+        await addSubProfile(updates.profile, updates.sub_profile);
+      }
+
+      // 4. Refresh & trigger background sync if online
+      await refreshLocalWorkouts();
+      if (navigator.onLine) {
+        syncService.runSync().catch(console.error);
+      }
+
+      return updatedRecord;
+    } catch (err) {
+      console.error('Failed to update workout:', err);
+      throw err;
+    }
+  },
+  [workouts, profiles, addProfile, addSubProfile, refreshLocalWorkouts]
+);</code></pre>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <div class="step-title">Stage 3: Reactive State Propagation & Downstream Invalidation</div>
+        <p>Avoid manually updating PR cards or chart states. By deriving them with <code>useMemo</code> from <code>allWorkouts</code>, changing any workout automatically triggers a flawless recalculation:</p>
+        <pre><code>// In ExerciseDetailView.tsx:
+const exerciseWorkouts = useMemo(() => {
+  return allWorkouts
+    .filter((w) => w.exercise.toLowerCase() === exerciseName.toLowerCase())
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}, [allWorkouts, exerciseName]);
+
+// Derived PR & totals recalculate automatically:
+const stats = useMemo(() => {
+  const maxWeight = Math.max(...exerciseWorkouts.map((w) => w.weight || 0), 0);
+  const totalReps = exerciseWorkouts.reduce((acc, w) => acc + w.sets * w.reps, 0);
+  return { maxWeight, totalReps, totalLogs: exerciseWorkouts.length };
+}, [exerciseWorkouts]);</code></pre>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <div class="step-title">Stage 4: Root Application Wiring & Component Contract (App.tsx)</div>
+        <p>Destructure <code>updateWorkout</code> in <code>App.tsx</code> and pass it down via props:</p>
+        <pre><code>&lt;ExerciseDetailView
+  exerciseName={selectedExercise}
+  allWorkouts={workouts}
+  onBack={() => setActiveView('hub')}
+  onUpdateWorkout={updateWorkout}
+  subProfiles={subProfiles}
+/&gt;</code></pre>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">5</div>
+      <div class="step-content">
+        <div class="step-title">Stage 5: Dual-Mode UI/UX & Inline Edit Design (ExerciseDetailView.tsx)</div>
+        <p>We built two intuitive ways to initiate editing:</p>
+        <ul>
+          <li><strong>Quick-Click Weight Badge:</strong> Clicking <code>@ {workout.weight} kg</code> immediately opens edit mode with the weight input focused for rapid correction.</li>
+          <li><strong>Dedicated Pencil Button:</strong> Sits next to the Delete button for editing sets, reps, fatigue, dates, or moving between sub-folders.</li>
+          <li><strong>Inline Edit Card:</strong> Features high-precision <code>-2.5</code> / <code>+2.5</code> stepper buttons, RIR pills, keyboard shortcuts (<code>Enter</code> to save, <code>Escape</code> to cancel), and feedback toast alerts.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">6</div>
+      <div class="step-content">
+        <div class="step-title">Stage 6: Compilation, Verification & Safe Git Practice</div>
+        <p>Never deliver a change without compiling both client and server in production mode:</p>
+        <pre><code># Client production build
+cd client && npm run build    # tsc -b && vite build
+
+# Server production build
+cd ../server && npm run build # tsc
+
+# Local commit (DO NOT push without explicit approval)
+git commit -am "feat: allow editing weight and details for logged exercises"</code></pre>
+      </div>
+    </div>
+
+    <h2>5. The Junior SWE Universal Checklist ("Make X Editable")</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Step</th>
+          <th>Phase</th>
+          <th>Task</th>
+          <th>Verification</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>Contract</td>
+          <td>Identify mutable vs. immutable fields (<code>id</code>, <code>created_at</code>)</td>
+          <td>Verify TypeScript types</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Backend</td>
+          <td>Add <code>PUT /api/resource/:id</code> with validation & <code>updated_at</code></td>
+          <td>Test via cURL or Postman</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Storage</td>
+          <td>Update IndexedDB with <code>sync_status: 'pending'</code></td>
+          <td>Check DevTools Application tab</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>Hook</td>
+          <td>Implement immutable update via <code>.map()</code></td>
+          <td>Check state updates in parent</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>Derivation</td>
+          <td>Derive PRs, totals, and charts via <code>useMemo</code></td>
+          <td>Ensure instant UI graph updates</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>UI Modes</td>
+          <td>Provide quick 1-tap micro-edit and full edit card</td>
+          <td>Test on mobile viewport</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>Ergonomics</td>
+          <td>Add steppers, <code>Enter</code> save, <code>Escape</code> cancel</td>
+          <td>Test purely with keyboard</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>Feedback</td>
+          <td>Show clear toast message upon save</td>
+          <td>Confirm visual feedback appears</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>Build</td>
+          <td>Run client and server TypeScript builds</td>
+          <td>0 compiler/bundler errors</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td>Git</td>
+          <td>Clean commit message; confirm before pushing</td>
+          <td>Clean <code>git status</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>6. Top 5 Traps That Break Production Mutations</h2>
+    <div class="card card-bad" style="margin-bottom: 12px;">
+      <div class="card-title">Trap 1: String Concatenation on Numbers ("80" + 2.5 = "802.5")</div>
+      <p>HTML input fields always yield strings. If you add <code>+ 2.5</code> directly, JavaScript converts the operation into string concatenation. Always use <code>parseFloat()</code> before doing arithmetic.</p>
+    </div>
+
+    <div class="card card-bad" style="margin-bottom: 12px;">
+      <div class="card-title">Trap 2: In-Place Array Mutation (workouts[i] = updated)</div>
+      <p>Modifying an array in place does not change the array's object identity in memory. React will assume the state is unchanged and skip re-rendering. Always use <code>prev.map(...)</code>.</p>
+    </div>
+
+    <div class="card card-bad" style="margin-bottom: 12px;">
+      <div class="card-title">Trap 3: Forgetting to Bump updated_at</div>
+      <p>If you edit a record without updating <code>updated_at</code>, the sync engine will treat the edit as older than the remote record during the next sync cycle and silently overwrite your changes.</p>
+    </div>
+
+    <div class="card card-bad" style="margin-bottom: 12px;">
+      <div class="card-title">Trap 4: Screen-Obscuring Modals on Mobile</div>
+      <p>Centered popups are frequently covered by mobile virtual keyboards, hiding the Save button. An inline expandable card ensures the browser scrolls the active field smoothly into view.</p>
+    </div>
+
+    <div class="card card-bad" style="margin-bottom: 12px;">
+      <div class="card-title">Trap 5: Duplicate Stored State for Calculated Statistics</div>
+      <p>Never store calculated metrics (like Max Weight or Total Reps) in separate states that require manual sync functions. Derive them directly from raw records with <code>useMemo</code> so they never go out of date.</p>
+    </div>
+
+  </div>
+</body>
+</html>
