@@ -9,3 +9,4 @@ gym_tracker.db-journal
 client/node_modules/
 client/dist/
 server/node_modules/
+*.tsbuildinfo

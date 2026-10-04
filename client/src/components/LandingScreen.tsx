@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, ArrowRight, RefreshCw, Maximize, Minimize } from 'lucide-react';
+import { Plus, ArrowRight, RefreshCw, Maximize, Minimize, X, Check, ArrowUpRight } from 'lucide-react';
+import { FootballIcon } from './FootballIcon';
+import { Goal } from '../types/goal';
+import { formatDaysRemaining } from '../hooks/useGoals';
 
 interface LandingScreenProps {
   exerciseCount: number;
@@ -7,6 +10,9 @@ interface LandingScreenProps {
   onToggleFullscreen: () => void;
   onGoToLog: () => void;
   onGoToExercises: () => void;
+  onGoToGoals?: () => void;
+  closestGoals?: Goal[];
+  onToggleGoal?: (id: string) => Promise<Goal | null>;
 }
 
 const PHILOSOPHICAL_QUOTES = [
@@ -42,9 +48,13 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
   onToggleFullscreen,
   onGoToLog,
   onGoToExercises,
+  onGoToGoals,
+  closestGoals = [],
+  onToggleGoal,
 }) => {
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [isRotating, setIsRotating] = useState(false);
+  const [isGoalsOpen, setIsGoalsOpen] = useState(false);
 
   const nextQuote = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -57,11 +67,155 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
 
   return (
     <div className="relative min-h-[88vh] flex flex-col justify-center items-center text-center px-4 select-none">
-      {/* Top Right Subtle Fullscreen Button */}
-      <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-20">
+      {/* Top Right Header Actions: Football Ball (Goals) & Fullscreen Buttons */}
+      <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-30 flex items-center gap-2">
+        {/* Football Ball Logo Button */}
+        <div className="relative">
+          <button
+            onClick={() => setIsGoalsOpen((prev) => !prev)}
+            className={`p-2 sm:p-2.5 rounded-2xl border transition-all duration-300 active:scale-95 flex items-center justify-center ${
+              isGoalsOpen
+                ? 'bg-[#CC6543] text-white border-[#CC6543] shadow-lg shadow-[#CC6543]/30 scale-105'
+                : 'bg-[#22201D]/80 hover:bg-[#2E2B26] text-[#A8A297] hover:text-[#F5F2EB] border-[#33302B] hover:border-[#4D4740]'
+            }`}
+            title="Closest Goals"
+          >
+            <FootballIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            {/* Active Goals Badge */}
+            {closestGoals.some((g) => !g.completed) && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#CC6543] ring-2 ring-[#191816] animate-pulse" />
+            )}
+          </button>
+
+          {/* =========================================================================
+              DESKTOP POPUP WINDOW (Floats right beneath the football button)
+             ========================================================================= */}
+          {isGoalsOpen && (
+            <div className="hidden sm:block absolute top-12 right-0 w-84 bg-[#1E1D1A]/95 backdrop-blur-2xl border border-[#383530] rounded-3xl p-5 shadow-2xl shadow-black/80 z-40 text-left animate-slide-up">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#2E2B26]">
+                <div className="flex items-center gap-2">
+                  <span className="p-1 rounded-lg bg-[#CC6543]/15 text-[#CC6543]">
+                    <FootballIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#F5F2EB]">
+                    Closest Goals
+                  </span>
+                </div>
+                <button
+                  onClick={() => setIsGoalsOpen(false)}
+                  className="p-1 rounded-lg text-[#8A857D] hover:text-[#F5F2EB] hover:bg-[#2E2B26] transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Goal List Items */}
+              {closestGoals.length === 0 ? (
+                <div className="py-6 text-center text-xs text-[#8A857D]">
+                  <p>No goals set yet.</p>
+                  {onGoToGoals && (
+                    <button
+                      onClick={() => {
+                        setIsGoalsOpen(false);
+                        onGoToGoals();
+                      }}
+                      className="mt-2 text-[#CC6543] font-semibold hover:underline inline-flex items-center gap-1"
+                    >
+                      Set your first goal →
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {closestGoals.map((goal) => {
+                    const days = formatDaysRemaining(goal.target_date);
+                    return (
+                      <div
+                        key={goal.id}
+                        className={`p-3 rounded-2xl border transition-all duration-700 flex items-start gap-2.5 ${
+                          goal.completed
+                            ? 'bg-[#1C1B18]/60 border-[#2B2824] opacity-45'
+                            : 'bg-[#252320]/80 border-[#33302B]'
+                        }`}
+                      >
+                        {/* Single Circle Tickbox */}
+                        <button
+                          type="button"
+                          onClick={() => onToggleGoal && onToggleGoal(goal.id)}
+                          className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 cursor-pointer active:scale-90 ${
+                            goal.completed
+                              ? 'bg-[#789D74] border-2 border-[#789D74] text-white shadow-sm'
+                              : 'border-2 border-[#555048] hover:border-[#789D74] bg-transparent'
+                          }`}
+                        >
+                          {goal.completed && (
+                            <Check className="w-3 h-3 stroke-[3] animate-pop-in" />
+                          )}
+                        </button>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="relative inline-block max-w-full">
+                            <span
+                              className={`text-xs font-semibold block truncate transition-colors duration-500 ${
+                                goal.completed ? 'text-[#8A8477]' : 'text-[#F5F2EB]'
+                              }`}
+                            >
+                              {goal.title}
+                            </span>
+                            {/* Animated Strikethrough Line */}
+                            <span
+                              className={`absolute left-0 top-1/2 -translate-y-1/2 h-[1.5px] bg-[#789D74] rounded-full transition-all duration-500 ease-out pointer-events-none ${
+                                goal.completed ? 'w-full opacity-90' : 'w-0 opacity-0'
+                              }`}
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2 mt-1">
+                            <span
+                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                                goal.completed
+                                  ? 'bg-[#789D74]/15 text-[#789D74] border-[#789D74]/30'
+                                  : days.isOverdue
+                                  ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                                  : 'bg-[#CC6543]/15 text-[#E59B80] border-[#CC6543]/30'
+                              }`}
+                            >
+                              {goal.completed ? 'Completed' : days.label}
+                            </span>
+                            <span className="text-[10px] text-[#666055]">
+                              {goal.target_date}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* View All Goals Link */}
+              {onGoToGoals && (
+                <div className="mt-3 pt-2.5 border-t border-[#2E2B26] text-center">
+                  <button
+                    onClick={() => {
+                      setIsGoalsOpen(false);
+                      onGoToGoals();
+                    }}
+                    className="text-[11px] font-semibold text-[#A8A297] hover:text-[#CC6543] transition-colors inline-flex items-center gap-1"
+                  >
+                    <span>View all goals</span>
+                    <ArrowUpRight className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Fullscreen Button */}
         <button
           onClick={onToggleFullscreen}
-          className="p-2 rounded-xl bg-claude-surface/40 hover:bg-claude-surface text-claude-textDim hover:text-claude-text border border-claude-border/50 hover:border-claude-border active:scale-95 transition-all duration-200"
+          className="p-2 sm:p-2.5 rounded-2xl bg-[#22201D]/80 hover:bg-[#2E2B26] text-[#A8A297] hover:text-[#F5F2EB] border border-[#33302B] hover:border-[#4D4740] active:scale-95 transition-all duration-200"
           title={isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'}
         >
           {isFullscreen ? (
@@ -71,6 +225,144 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
           )}
         </button>
       </div>
+
+      {/* =========================================================================
+          PHONE VIEWPORT MODAL OVERLAY (Directly in front of Home Window on Mobile)
+         ========================================================================= */}
+      {isGoalsOpen && (
+        <div className="sm:hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div
+            className="w-full max-w-sm bg-[#1E1D1A] border border-[#383530] rounded-3xl p-5 shadow-2xl text-left animate-pop-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[#2E2B26]">
+              <div className="flex items-center gap-2.5">
+                <span className="p-1.5 rounded-xl bg-[#CC6543]/15 text-[#CC6543]">
+                  <FootballIcon className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-[#F5F2EB]">Closest Goals</h3>
+                  <p className="text-[10px] text-[#8A857D]">3 targets closest to your date</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsGoalsOpen(false)}
+                className="p-1.5 rounded-xl bg-[#252320] text-[#A8A297] hover:text-[#F5F2EB] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Goal List */}
+            {closestGoals.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#8A857D]">
+                <p>No goals set yet.</p>
+                {onGoToGoals && (
+                  <button
+                    onClick={() => {
+                      setIsGoalsOpen(false);
+                      onGoToGoals();
+                    }}
+                    className="mt-3 px-4 py-2 rounded-xl bg-[#CC6543] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                  >
+                    <span>Set your first goal</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {closestGoals.map((goal) => {
+                  const days = formatDaysRemaining(goal.target_date);
+                  return (
+                    <div
+                      key={goal.id}
+                      className={`p-3.5 rounded-2xl border transition-all duration-700 flex items-start gap-3 ${
+                        goal.completed
+                          ? 'bg-[#1C1B18]/70 border-[#2B2824] opacity-45'
+                          : 'bg-[#252320] border-[#383530]'
+                      }`}
+                    >
+                      {/* Circle Tickbox (Green when Checked) */}
+                      <button
+                        type="button"
+                        onClick={() => onToggleGoal && onToggleGoal(goal.id)}
+                        className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 cursor-pointer active:scale-90 ${
+                          goal.completed
+                            ? 'bg-[#789D74] border-2 border-[#789D74] text-white shadow-md shadow-[#789D74]/30'
+                            : 'border-2 border-[#555048] hover:border-[#789D74] bg-transparent'
+                        }`}
+                      >
+                        {goal.completed && (
+                          <Check className="w-3.5 h-3.5 stroke-[3] animate-pop-in" />
+                        )}
+                      </button>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="relative inline-block max-w-full">
+                          <span
+                            className={`text-sm font-semibold block truncate transition-colors duration-500 ${
+                              goal.completed ? 'text-[#8A8477]' : 'text-[#F5F2EB]'
+                            }`}
+                          >
+                            {goal.title}
+                          </span>
+                          {/* Animated Strikethrough Line */}
+                          <span
+                            className={`absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-[#789D74] rounded-full transition-all duration-500 ease-out pointer-events-none ${
+                              goal.completed ? 'w-full opacity-90' : 'w-0 opacity-0'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                              goal.completed
+                                ? 'bg-[#789D74]/15 text-[#789D74] border-[#789D74]/30'
+                                : days.isOverdue
+                                ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                                : 'bg-[#CC6543]/15 text-[#E59B80] border-[#CC6543]/30'
+                            }`}
+                          >
+                            {goal.completed ? 'Completed' : days.label}
+                          </span>
+                          <span className="text-[11px] text-[#666055]">
+                            Target: {goal.target_date}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Mobile Footer: Go to Full Goals Screen */}
+            {onGoToGoals && (
+              <div className="mt-4 pt-3 border-t border-[#2E2B26] flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    setIsGoalsOpen(false);
+                    onGoToGoals();
+                  }}
+                  className="text-xs font-semibold text-[#CC6543] hover:text-[#DE7C5A] inline-flex items-center gap-1.5 py-1"
+                >
+                  <span>Open Full Goal Settings</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setIsGoalsOpen(false)}
+                  className="text-xs text-[#8A857D] hover:text-[#F5F2EB] py-1 px-3 rounded-lg bg-[#252320]"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Seamless Ambient Radial Glow */}
       <div

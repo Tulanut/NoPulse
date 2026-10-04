@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import workoutRoutes from './routes/workoutRoutes';
+import goalRoutes from './routes/goalRoutes';
 import { db } from './db/database';
 
 dotenv.config();
@@ -19,6 +20,7 @@ app.use(express.json());
 
 // API Routes
 app.use('/api', workoutRoutes);
+app.use('/api', goalRoutes);
 
 // Root greeting
 app.get('/', (_req, res) => {

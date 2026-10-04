@@ -14,10 +14,11 @@ import {
   ChevronRight,
   PanelLeft,
   PanelTop,
+  Target,
 } from 'lucide-react';
 import { SyncState } from '../services/syncService';
 
-export type ScreenState = 'landing' | 'log' | 'exercises' | 'exercise-detail' | 'profile';
+export type ScreenState = 'landing' | 'log' | 'exercises' | 'exercise-detail' | 'profile' | 'goals';
 export type NavPosition = 'top' | 'side';
 
 interface HeaderProps {
@@ -290,6 +291,22 @@ export const Header: React.FC<HeaderProps> = ({
               <User className="w-4 h-4" />
               <span>Profile</span>
             </button>
+
+            <button
+              onClick={() => {
+                onNavigate('goals');
+                hide();
+              }}
+              className={`flex flex-col items-center justify-center gap-1 w-full py-2.5 rounded-xl text-[10px] active:scale-95 transition-all duration-200 ${
+                currentScreen === 'goals'
+                  ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/25'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
+              }`}
+              title="Goals"
+            >
+              <Target className="w-4 h-4" />
+              <span>Goals</span>
+            </button>
           </nav>
 
           {/* Bottom: Utilities */}
@@ -459,6 +476,21 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <User className="w-3.5 h-3.5" />
               <span>Profile</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('goals');
+                hide();
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs active:scale-95 transition-all duration-200 ${
+                currentScreen === 'goals'
+                  ? 'bg-[#CC6543] text-white shadow-md shadow-[#CC6543]/25 font-bold'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB] hover:bg-[#2E2B26]/50'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5" />
+              <span>Goals</span>
             </button>
           </nav>
 

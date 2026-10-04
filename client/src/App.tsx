@@ -5,7 +5,9 @@ import { ExerciseHub } from './components/ExerciseHub';
 import { ExerciseDetailView } from './components/ExerciseDetailView';
 import { WorkoutForm } from './components/WorkoutForm';
 import { UserProfileView } from './components/UserProfileView';
+import { GoalsView } from './components/GoalsView';
 import { useWorkouts } from './hooks/useWorkouts';
+import { useGoals } from './hooks/useGoals';
 import { useFullscreen } from './hooks/useFullscreen';
 import { ShieldCheck, HardDrive, Check } from 'lucide-react';
 
@@ -39,6 +41,16 @@ export const App: React.FC = () => {
     deleteWorkout,
     manualSync,
   } = useWorkouts();
+
+  const {
+    goals,
+    activeGoals,
+    completedGoals,
+    closestGoals,
+    addGoal,
+    toggleGoalCompletion,
+    deleteGoal,
+  } = useGoals();
 
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
@@ -190,6 +202,9 @@ export const App: React.FC = () => {
               onToggleFullscreen={toggleFullscreen}
               onGoToLog={() => setCurrentScreen('log')}
               onGoToExercises={() => setCurrentScreen('exercises')}
+              onGoToGoals={() => setCurrentScreen('goals')}
+              closestGoals={closestGoals}
+              onToggleGoal={toggleGoalCompletion}
             />
           )}
 
@@ -252,6 +267,19 @@ export const App: React.FC = () => {
               workouts={allWorkouts}
               navPosition={navPosition}
               onToggleNavPosition={toggleNavPosition}
+              onBackToHome={handleGoHome}
+            />
+          )}
+
+          {/* 6. Dedicated Goals Screen */}
+          {currentScreen === 'goals' && (
+            <GoalsView
+              goals={goals}
+              activeGoals={activeGoals}
+              completedGoals={completedGoals}
+              onAddGoal={addGoal}
+              onToggleGoal={toggleGoalCompletion}
+              onDeleteGoal={deleteGoal}
               onBackToHome={handleGoHome}
             />
           )}

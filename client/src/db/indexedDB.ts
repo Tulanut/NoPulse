@@ -1,8 +1,10 @@
 import { Workout } from '../types/workout';
+import { Goal } from '../types/goal';
 
 const DB_NAME = 'nopulse_gym_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const WORKOUTS_STORE = 'workouts';
+const GOALS_STORE = 'goals';
 const METADATA_STORE = 'metadata';
 
 class LocalDatabase {
@@ -29,6 +31,15 @@ class LocalDatabase {
           workoutStore.createIndex('profile', 'profile', { unique: false });
           workoutStore.createIndex('sync_status', 'sync_status', { unique: false });
           workoutStore.createIndex('updated_at', 'updated_at', { unique: false });
+        }
+
+        // Goals store
+        if (!db.objectStoreNames.contains(GOALS_STORE)) {
+          const goalStore = db.createObjectStore(GOALS_STORE, { keyPath: 'id' });
+          goalStore.createIndex('target_date', 'target_date', { unique: false });
+          goalStore.createIndex('completed', 'completed', { unique: false });
+          goalStore.createIndex('sync_status', 'sync_status', { unique: false });
+          goalStore.createIndex('updated_at', 'updated_at', { unique: false });
         }
 
         // Metadata store (for last_synced_at timestamp, custom profiles, etc.)
@@ -281,6 +292,167 @@ class LocalDatabase {
     } catch (e) {
       console.error('Error saving custom sub profiles:', e);
     }
+  }
+
+  // --- GOAL OPERATIONS ---
+  public async getAllGoals(includeDeleted: boolean = false): Promise<Goal[]> {
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(GOALS_STORE, 'readonly');
+      const store = tx.objectStore(GOALS_STORE);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        let results = (request.result as Goal[]) || [];
+        if (!includeDeleted) {
+          results = results.filter((g) => g.is_deleted !== 1);
+        }
+        // Sort ascending by target_date (earliest deadline first)
+        results.sort((a, b) => {
+          if (a.target_date !== b.target_date) {
+            return a.target_date.localeCompare(b.target_date);
+          }
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+        resolve(results);
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  public async getGoalById(id: string): Promise<Goal | undefined> {
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(GOALS_STORE, 'readonly');
+      const store = tx.objectStore(GOALS_STORE);
+      const request = store.get(id);
+
+      request.onsuccess = () => resolve(request.result as Goal | undefined);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  public async saveGoal(goal: Goal): Promise<Goal> {
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(GOALS_STORE, 'readwrite');
+      const store = tx.objectStore(GOALS_STORE);
+
+      const request = store.put(goal);
+
+      request.onsuccess = () => resolve(goal);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  public async deleteGoal(id: string, softDelete: boolean = true): Promise<void> {
+    const db = await this.getDB();
+    const existing = await this.getGoalById(id);
+    if (!existing) return;
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(GOALS_STORE, 'readwrite');
+      const store = tx.objectStore(GOALS_STORE);
+
+      if (softDelete) {
+        const updated: Goal = {
+          ...existing,
+          is_deleted: 1,
+          updated_at: new Date().toISOString(),
+          sync_status: 'pending',
+        };
+        const request = store.put(updated);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      } else {
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      }
+    });
+  }
+
+  public async getPendingSyncGoals(): Promise<Goal[]> {
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(GOALS_STORE, 'readonly');
+      const store = tx.objectStore(GOALS_STORE);
+      const index = store.index('sync_status');
+      const request = index.getAll('pending');
+
+      request.onsuccess = () => resolve((request.result as Goal[]) || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  public async markGoalsAsSynced(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(GOALS_STORE, 'readwrite');
+      const store = tx.objectStore(GOALS_STORE);
+
+      let processed = 0;
+      ids.forEach((id) => {
+        const getReq = store.get(id);
+        getReq.onsuccess = () => {
+          const item = getReq.result as Goal | undefined;
+          if (item) {
+            item.sync_status = 'synced';
+            store.put(item);
+          }
+          processed++;
+          if (processed === ids.length) resolve();
+        };
+        getReq.onerror = () => {
+          processed++;
+          if (processed === ids.length) resolve();
+        };
+      });
+
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  public async bulkMergeServerGoals(serverGoals: Goal[]): Promise<void> {
+    if (!serverGoals || serverGoals.length === 0) return;
+    const db = await this.getDB();
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(GOALS_STORE, 'readwrite');
+      const store = tx.objectStore(GOALS_STORE);
+
+      let completed = 0;
+      serverGoals.forEach((serverG) => {
+        const getReq = store.get(serverG.id);
+        getReq.onsuccess = () => {
+          const localG = getReq.result as Goal | undefined;
+
+          if (!localG) {
+            store.put({ ...serverG, sync_status: 'synced' });
+          } else if (localG.sync_status !== 'pending') {
+            store.put({ ...serverG, sync_status: 'synced' });
+          } else {
+            const serverTime = new Date(serverG.updated_at).getTime();
+            const localTime = new Date(localG.updated_at).getTime();
+            if (serverTime > localTime) {
+              store.put({ ...serverG, sync_status: 'synced' });
+            }
+          }
+
+          completed++;
+          if (completed === serverGoals.length) resolve();
+        };
+
+        getReq.onerror = () => {
+          completed++;
+          if (completed === serverGoals.length) resolve();
+        };
+      });
+
+      tx.onerror = () => reject(tx.error);
+    });
   }
 }
 
