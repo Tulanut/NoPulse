@@ -91,7 +91,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
               DESKTOP POPUP WINDOW (Floats right beneath the football button)
              ========================================================================= */}
           {isGoalsOpen && (
-            <div className="hidden sm:block absolute top-12 right-0 w-84 bg-[#1E1D1A]/95 backdrop-blur-2xl border border-[#383530] rounded-3xl p-5 shadow-2xl shadow-black/80 z-40 text-left animate-slide-up">
+            <div className="hidden sm:block absolute top-12 right-0 w-80 min-w-[320px] bg-[#1E1D1A]/95 backdrop-blur-2xl border border-[#383530] rounded-3xl p-5 shadow-2xl shadow-black/80 z-40 text-left animate-slide-up">
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#2E2B26]">
                 <div className="flex items-center gap-2">
                   <span className="p-1 rounded-lg bg-[#CC6543]/15 text-[#CC6543]">
@@ -170,9 +170,9 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                             />
                           </div>
 
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="mt-1">
                             <span
-                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                              className={`inline-flex items-center whitespace-nowrap text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                                 goal.completed
                                   ? 'bg-[#789D74]/15 text-[#789D74] border-[#789D74]/30'
                                   : days.isOverdue
@@ -181,9 +181,6 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                               }`}
                             >
                               {goal.completed ? 'Completed' : days.label}
-                            </span>
-                            <span className="text-[10px] text-[#666055]">
-                              {goal.target_date}
                             </span>
                           </div>
                         </div>
@@ -316,9 +313,9 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                           />
                         </div>
 
-                        <div className="flex items-center gap-2 mt-1.5">
+                        <div className="mt-1.5">
                           <span
-                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                            className={`inline-flex items-center whitespace-nowrap text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                               goal.completed
                                 ? 'bg-[#789D74]/15 text-[#789D74] border-[#789D74]/30'
                                 : days.isOverdue
@@ -327,9 +324,6 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                             }`}
                           >
                             {goal.completed ? 'Completed' : days.label}
-                          </span>
-                          <span className="text-[11px] text-[#666055]">
-                            Target: {goal.target_date}
                           </span>
                         </div>
                       </div>
