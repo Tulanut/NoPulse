@@ -68,10 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // For mobile devices, ONLY make navigation available on the left side (side rail)
-  const effectiveNavPosition = isMobile ? 'side' : navPosition;
-
-  // Auto-hide helper
+  // Auto-hide helper (desktop only)
   const scheduleAutoHide = useCallback((delay = 3000) => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = window.setTimeout(() => {
@@ -97,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
     if (isMobile) return; // Desktop only
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (effectiveNavPosition === 'top') {
+      if (navPosition === 'top') {
         if (e.clientY <= 45) {
           reveal(false);
         }
@@ -110,32 +107,22 @@ export const Header: React.FC<HeaderProps> = ({
 
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [effectiveNavPosition, isMobile, reveal]);
+  }, [navPosition, isMobile, reveal]);
 
-  // 2. Strict Mobile Scroll: ONLY show when scrolled all the way to the top
+  // 2. Desktop Scroll Trigger: Auto-hide on scroll down
   useEffect(() => {
+    if (isMobile) return; // Desktop only
+
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-
-      if (isMobile) {
-        // Mobile rule: ONLY reveal when scrolled all the way to the top (scrollY <= 10)
-        if (currentScrollY <= 10) {
-          reveal(true);
-        } else {
-          // Scrolling anywhere down or mid-page keeps the taskbar completely hidden
-          hide();
-        }
-      } else {
-        // Desktop scroll
-        if (currentScrollY > 60) {
-          hide();
-        }
+      if (currentScrollY > 60) {
+        hide();
       }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMobile, hide, reveal]);
+  }, [isMobile, hide]);
 
   const handleMouseEnter = () => {
     if (isMobile) return;
@@ -164,12 +151,140 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   // =========================================================================
-  // 1. SIDE POSITION NAVIGATION (MANDATORY FOR MOBILE, OPTIONAL FOR DESKTOP)
+  // 1. DEDICATED RESPONSIVE MOBILE NAVIGATION (< 640px)
   // =========================================================================
-  if (effectiveNavPosition === 'side') {
+  if (isMobile) {
     return (
       <>
-        {/* Left Hover / Touch Trigger Edge */}
+        {/* Compact Mobile Top Header */}
+        <header className="fixed top-0 left-0 right-0 z-40 bg-[#1A1816]/95 backdrop-blur-xl border-b border-[#2E2B26]/80 px-4 py-2.5 flex items-center justify-between shadow-lg shadow-black/40">
+          <button
+            onClick={() => onNavigate('landing')}
+            className="flex items-center gap-2 active:scale-95 transition-all text-left"
+          >
+            <div className="w-7 h-7 rounded-lg bg-[#CC6543] flex items-center justify-center shadow-sm shadow-[#CC6543]/20">
+              <Dumbbell className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="text-sm font-bold text-[#F5F2EB] tracking-tight">
+              NoPulse
+            </span>
+          </button>
+
+          <div className="flex items-center gap-2">
+            {pendingSyncCount > 0 && (
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-[#CC6543]/15 text-[#E59B80] border border-[#CC6543]/30 font-semibold animate-pop-in">
+                <AlertCircle className="w-3 h-3" />
+                <span>{pendingSyncCount}</span>
+              </div>
+            )}
+
+            <button
+              onClick={onManualSync}
+              disabled={syncState === 'syncing' || !isOnline}
+              className="p-1.5 rounded-lg bg-[#22201D] border border-[#33302B] text-[#A8A297] hover:text-[#F5F2EB] active:scale-90 transition disabled:opacity-40"
+              title={lastSyncedAt ? `Last Synced: ${formatTime(lastSyncedAt)}` : 'Sync Database'}
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${
+                  syncState === 'syncing' ? 'animate-spin text-[#CC6543]' : ''
+                }`}
+              />
+            </button>
+
+            <button
+              onClick={onToggleFullscreen}
+              className="p-1.5 rounded-lg bg-[#22201D] border border-[#33302B] text-[#A8A297] hover:text-[#F5F2EB] active:scale-90 transition"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            <div
+              className={`w-2.5 h-2.5 rounded-full ${
+                isOnline ? 'bg-[#789D74]' : 'bg-[#E08E45]'
+              }`}
+              title={isOnline ? 'Online' : 'Offline'}
+            />
+          </div>
+        </header>
+
+        {/* Fixed Mobile Bottom Navigation Bar */}
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#1A1816]/98 backdrop-blur-2xl border-t border-[#2E2B26]/90 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-2xl shadow-black/80">
+          <button
+            onClick={() => onNavigate('landing')}
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+              currentScreen === 'landing'
+                ? 'text-[#CC6543] font-bold'
+                : 'text-[#A8A297] hover:text-[#F5F2EB]'
+            }`}
+          >
+            <Home className="w-4 h-4" />
+            <span>Home</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('log')}
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+              currentScreen === 'log'
+                ? 'text-[#CC6543] font-bold'
+                : 'text-[#A8A297] hover:text-[#F5F2EB]'
+            }`}
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Add Log</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('exercises')}
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+              currentScreen === 'exercises' || currentScreen === 'exercise-detail'
+                ? 'text-[#CC6543] font-bold'
+                : 'text-[#A8A297] hover:text-[#F5F2EB]'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Exercises</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('goals')}
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+              currentScreen === 'goals'
+                ? 'text-[#CC6543] font-bold'
+                : 'text-[#A8A297] hover:text-[#F5F2EB]'
+            }`}
+          >
+            <Target className="w-4 h-4" />
+            <span>Goals</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('profile')}
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+              currentScreen === 'profile'
+                ? 'text-[#CC6543] font-bold'
+                : 'text-[#A8A297] hover:text-[#F5F2EB]'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            <span>Profile</span>
+          </button>
+        </nav>
+      </>
+    );
+  }
+
+  // =========================================================================
+  // 2. DESKTOP SIDE POSITION NAVIGATION (>= 640px)
+  // =========================================================================
+  if (navPosition === 'side') {
+    return (
+      <>
+        {/* Left Hover Trigger Edge */}
         <div
           onMouseEnter={handleMouseEnter}
           onClick={handleTouchTab}
@@ -190,14 +305,6 @@ export const Header: React.FC<HeaderProps> = ({
             <ChevronRight className="w-3 h-3 text-[#CC6543] mt-0.5" />
           </div>
         </div>
-
-        {/* Backdrop overlay on mobile when open */}
-        {isRevealed && (
-          <div
-            onClick={hide}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 sm:hidden animate-fade-in"
-          />
-        )}
 
         {/* Floating Side Navigation Rail */}
         <aside

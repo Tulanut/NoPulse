@@ -179,8 +179,8 @@ export const App: React.FC = () => {
           currentScreen === 'landing'
             ? 'flex flex-col justify-center py-6'
             : navPosition === 'side'
-            ? 'sm:pl-28 pt-8 pb-16'
-            : 'pt-20 sm:pt-24 pb-16'
+            ? 'pt-16 pb-24 sm:pt-8 sm:pb-16 sm:pl-28'
+            : 'pt-16 pb-24 sm:pt-24 sm:pb-16'
         }`}
       >
         {/* Offline Banner if Offline */}
