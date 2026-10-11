@@ -39,6 +39,7 @@ export const App: React.FC = () => {
     addWorkout,
     updateWorkout,
     deleteWorkout,
+    importWorkouts,
     manualSync,
   } = useWorkouts();
 
@@ -265,6 +266,7 @@ export const App: React.FC = () => {
           {currentScreen === 'profile' && (
             <UserProfileView
               workouts={allWorkouts}
+              onImportWorkouts={importWorkouts}
               navPosition={navPosition}
               onToggleNavPosition={toggleNavPosition}
               onBackToHome={handleGoHome}

@@ -112,6 +112,22 @@ class LocalDatabase {
     });
   }
 
+  public async bulkSaveWorkouts(workouts: Workout[]): Promise<void> {
+    if (!workouts || workouts.length === 0) return;
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(WORKOUTS_STORE, 'readwrite');
+      const store = tx.objectStore(WORKOUTS_STORE);
+
+      for (const workout of workouts) {
+        store.put(workout);
+      }
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
   public async deleteWorkout(id: string): Promise<void> {
     const existing = await this.getWorkoutById(id);
     if (!existing) return;

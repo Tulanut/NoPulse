@@ -582,6 +582,84 @@ export function useWorkouts() {
     [customProfiles, customSubProfiles, network.isOnline, refreshLocalWorkouts]
   );
 
+  // Import multiple workouts (e.g. from CSV)
+  const importWorkouts = useCallback(
+    async (
+      incomingWorkouts: Array<{
+        exercise_name: string;
+        sets: number;
+        reps: number;
+        rir: number;
+        weight?: number | null;
+        profile?: string | null;
+        sub_profile?: string | null;
+        date: string;
+        notes?: string | null;
+      }>
+    ): Promise<number> => {
+      if (!incomingWorkouts || incomingWorkouts.length === 0) return 0;
+
+      const now = new Date().toISOString();
+      const newWorkouts: Workout[] = incomingWorkouts.map((item) => ({
+        id: generateUUID(),
+        exercise_name: item.exercise_name.trim(),
+        sets: Math.max(1, Number(item.sets) || 1),
+        reps: Math.max(0, Number(item.reps) || 0),
+        rir: Number(item.rir) || 0,
+        weight: item.weight != null && !isNaN(Number(item.weight)) ? Number(item.weight) : null,
+        profile: item.profile ? item.profile.trim() : null,
+        sub_profile: item.sub_profile ? item.sub_profile.trim() : null,
+        date: item.date || now.split('T')[0],
+        notes: item.notes?.trim() || null,
+        created_at: now,
+        updated_at: now,
+        is_deleted: 0,
+        sync_status: 'pending',
+      }));
+
+      // 1. Detect any new profiles or sub-profiles
+      let updatedProfiles = [...customProfiles];
+      let profilesChanged = false;
+      const updatedSubProfiles = { ...customSubProfiles };
+      let subProfilesChanged = false;
+
+      for (const w of newWorkouts) {
+        if (w.profile && !updatedProfiles.includes(w.profile)) {
+          updatedProfiles.push(w.profile);
+          profilesChanged = true;
+        }
+        if (w.profile && w.sub_profile) {
+          const currentSubs = updatedSubProfiles[w.profile] || [];
+          if (!currentSubs.some((s) => s.toLowerCase() === w.sub_profile!.toLowerCase())) {
+            updatedSubProfiles[w.profile] = [...currentSubs, w.sub_profile];
+            subProfilesChanged = true;
+          }
+        }
+      }
+
+      if (profilesChanged) {
+        setCustomProfiles(updatedProfiles);
+        await localDB.saveCustomProfiles(updatedProfiles);
+      }
+      if (subProfilesChanged) {
+        setCustomSubProfiles(updatedSubProfiles);
+        await localDB.saveCustomSubProfiles(updatedSubProfiles);
+      }
+
+      // 2. Batch save to local IndexedDB
+      await localDB.bulkSaveWorkouts(newWorkouts);
+      await refreshLocalWorkouts();
+
+      // 3. Trigger server sync if online
+      if (network.isOnline) {
+        syncService.runSync().then(() => refreshLocalWorkouts());
+      }
+
+      return newWorkouts.length;
+    },
+    [customProfiles, customSubProfiles, network.isOnline, refreshLocalWorkouts]
+  );
+
   // Update an existing workout entry by ID
   const updateWorkout = useCallback(
     async (
@@ -791,6 +869,7 @@ export function useWorkouts() {
     addWorkout,
     updateWorkout,
     deleteWorkout,
+    importWorkouts,
     manualSync,
     refreshLocalWorkouts,
   };

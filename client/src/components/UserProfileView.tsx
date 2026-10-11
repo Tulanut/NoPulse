@@ -21,11 +21,14 @@ import {
   Square,
   RotateCcw,
   Target,
+  Upload,
+  AlertCircle,
 } from 'lucide-react';
 import { Workout } from '../types/workout';
 import { UserProfileData, UserSocials } from '../types/user';
 import { NavPosition } from './Header';
 import { formatSpelledDate } from '../utils/dateUtils';
+import { parseWorkoutsCSV, generateCSVTemplate } from '../utils/csvParser';
 import {
   AVAILABLE_METRICS,
   DEFAULT_DISPLAY_PREFERENCES,
@@ -37,6 +40,19 @@ import {
 
 interface UserProfileViewProps {
   workouts: Workout[];
+  onImportWorkouts?: (
+    workouts: Array<{
+      exercise_name: string;
+      sets: number;
+      reps: number;
+      rir: number;
+      weight?: number | null;
+      profile?: string | null;
+      sub_profile?: string | null;
+      date: string;
+      notes?: string | null;
+    }>
+  ) => Promise<number>;
   navPosition?: NavPosition;
   onToggleNavPosition?: () => void;
   onBackToHome: () => void;
@@ -80,9 +96,15 @@ function formatSocialLink(platform: keyof UserSocials, input?: string): string |
 
 export const UserProfileView: React.FC<UserProfileViewProps> = ({
   workouts,
+  onImportWorkouts,
   navPosition = 'top',
   onToggleNavPosition,
 }) => {
+  // CSV Import State
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
+
   // Load saved local profile or fallback to defaults
   const [profile, setProfile] = useState<UserProfileData>(() => {
     const saved = localStorage.getItem('nopulse_user_profile');
@@ -393,6 +415,71 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     const a = document.createElement('a');
     a.href = url;
     a.download = `nopulse-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    if (csvFileInputRef.current) {
+      csvFileInputRef.current.value = '';
+      csvFileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportMessage(null);
+
+    try {
+      const text = await file.text();
+      const parseResult = parseWorkoutsCSV(text);
+
+      if (!parseResult.success || parseResult.workouts.length === 0) {
+        const errorDetail =
+          parseResult.errors.length > 0 ? parseResult.errors[0] : 'No valid workout logs found in CSV.';
+        setImportMessage({
+          type: 'error',
+          text: errorDetail,
+        });
+        return;
+      }
+
+      if (onImportWorkouts) {
+        const count = await onImportWorkouts(parseResult.workouts);
+        setImportMessage({
+          type: 'success',
+          text: `Successfully imported ${count} workout ${count === 1 ? 'entry' : 'entries'}!`,
+        });
+        setTimeout(() => {
+          setImportMessage((prev) => (prev?.type === 'success' ? null : prev));
+        }, 5000);
+      } else {
+        setImportMessage({
+          type: 'error',
+          text: 'Import handler is unavailable.',
+        });
+      }
+    } catch (err: any) {
+      console.error('CSV import failed:', err);
+      setImportMessage({
+        type: 'error',
+        text: err?.message || 'Failed to read or parse the CSV file.',
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const templateContent = generateCSVTemplate();
+    const blob = new Blob([templateContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nopulse-workouts-template.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1061,7 +1148,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             Data & Backup
           </h2>
           <p className="text-xs text-[#A8A297] mt-0.5">
-            Export a full JSON backup of all your recorded exercises and workout logs.
+            Export a full JSON backup or import workout logs from a .CSV spreadsheet.
           </p>
         </div>
 
@@ -1080,14 +1167,60 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleExportData}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#252320] border border-[#383530] hover:border-[#CC6543] text-xs font-semibold text-[#F5F2EB] hover:text-white transition active:scale-95"
-          >
-            <Download className="w-4 h-4 text-[#CC6543]" />
-            <span>Export Data Backup (JSON)</span>
-          </button>
+          <div className="flex flex-col gap-2.5 w-full sm:w-auto items-stretch sm:items-end">
+            <button
+              type="button"
+              onClick={handleExportData}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#252320] border border-[#383530] hover:border-[#CC6543] text-xs font-semibold text-[#F5F2EB] hover:text-white transition active:scale-95"
+            >
+              <Download className="w-4 h-4 text-[#CC6543]" />
+              <span>Export Data Backup (JSON)</span>
+            </button>
+
+            {/* Hidden CSV file input */}
+            <input
+              ref={csvFileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+
+            <button
+              type="button"
+              onClick={handleImportClick}
+              disabled={isImporting}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#252320] border border-[#383530] hover:border-[#789D74] text-xs font-semibold text-[#F5F2EB] hover:text-white transition active:scale-95 disabled:opacity-50"
+            >
+              <Upload className="w-4 h-4 text-[#789D74]" />
+              <span>{isImporting ? 'Importing CSV...' : 'Import Workouts (.CSV)'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="text-[11px] text-[#A8A297] hover:text-[#CC6543] underline underline-offset-2 transition text-center sm:text-right pr-1"
+            >
+              Download CSV Template
+            </button>
+
+            {importMessage && (
+              <div
+                className={`mt-1 text-xs px-3 py-1.5 rounded-lg border flex items-center gap-1.5 ${
+                  importMessage.type === 'success'
+                    ? 'bg-[#789D74]/15 border-[#789D74]/30 text-[#789D74]'
+                    : 'bg-[#CC6543]/15 border-[#CC6543]/30 text-[#CC6543]'
+                }`}
+              >
+                {importMessage.type === 'success' ? (
+                  <Check className="w-3.5 h-3.5 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span>{importMessage.text}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
