@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, ArrowRight, RefreshCw, Maximize, Minimize, X, Check, ArrowUpRight } from 'lucide-react';
 import { FootballIcon } from './FootballIcon';
 import { Goal } from '../types/goal';
@@ -55,6 +55,29 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [isRotating, setIsRotating] = useState(false);
   const [isGoalsOpen, setIsGoalsOpen] = useState(false);
+  const [completingGoalIds, setCompletingGoalIds] = useState<Set<string>>(new Set());
+
+  // Home Screen only displays uncompleted goals (or goals currently in their brief finishing animation)
+  const homeGoals = useMemo(() => {
+    return closestGoals.filter((g) => !g.completed || completingGoalIds.has(g.id));
+  }, [closestGoals, completingGoalIds]);
+
+  const handleToggleGoal = (goalId: string) => {
+    // 1. Mark as completing to play green checkmark + strikethrough line + fade-out animation
+    setCompletingGoalIds((prev) => new Set(prev).add(goalId));
+
+    // 2. After 600ms, commit completion in database so it is cleanly removed from Home Screen
+    setTimeout(async () => {
+      if (onToggleGoal) {
+        await onToggleGoal(goalId);
+      }
+      setCompletingGoalIds((prev) => {
+        const next = new Set(prev);
+        next.delete(goalId);
+        return next;
+      });
+    }, 600);
+  };
 
   const nextQuote = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -110,7 +133,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
               </div>
 
               {/* Goal List Items */}
-              {closestGoals.length === 0 ? (
+              {homeGoals.length === 0 ? (
                 <div className="py-6 text-center text-xs text-[#8A857D]">
                   <p>No goals set yet.</p>
                   {onGoToGoals && (
@@ -127,28 +150,29 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  {closestGoals.map((goal) => {
+                  {homeGoals.map((goal) => {
                     const days = formatDaysRemaining(goal.target_date);
+                    const isCompletedOrCompleting = goal.completed || completingGoalIds.has(goal.id);
                     return (
                       <div
                         key={goal.id}
-                        className={`p-3 rounded-2xl border transition-all duration-700 flex items-start gap-2.5 ${
-                          goal.completed
-                            ? 'bg-[#1C1B18]/60 border-[#2B2824] opacity-45'
-                            : 'bg-[#252320]/80 border-[#33302B]'
+                        className={`p-3 rounded-2xl border transition-all duration-500 flex items-start gap-2.5 ${
+                          isCompletedOrCompleting
+                            ? 'bg-[#1C1B18]/60 border-[#2B2824] opacity-0 scale-95 pointer-events-none'
+                            : 'bg-[#252320]/80 border-[#33302B] opacity-100 scale-100'
                         }`}
                       >
                         {/* Single Circle Tickbox */}
                         <button
                           type="button"
-                          onClick={() => onToggleGoal && onToggleGoal(goal.id)}
+                          onClick={() => handleToggleGoal(goal.id)}
                           className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 cursor-pointer active:scale-90 ${
-                            goal.completed
+                            isCompletedOrCompleting
                               ? 'bg-[#789D74] border-2 border-[#789D74] text-white shadow-sm'
                               : 'border-2 border-[#555048] hover:border-[#789D74] bg-transparent'
                           }`}
                         >
-                          {goal.completed && (
+                          {isCompletedOrCompleting && (
                             <Check className="w-3 h-3 stroke-[3] animate-pop-in" />
                           )}
                         </button>
@@ -157,7 +181,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                           <div className="relative inline-block max-w-full">
                             <span
                               className={`text-xs font-semibold block truncate transition-colors duration-500 ${
-                                goal.completed ? 'text-[#8A8477]' : 'text-[#F5F2EB]'
+                                isCompletedOrCompleting ? 'text-[#8A8477]' : 'text-[#F5F2EB]'
                               }`}
                             >
                               {goal.title}
@@ -165,7 +189,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                             {/* Animated Strikethrough Line */}
                             <span
                               className={`absolute left-0 top-1/2 -translate-y-1/2 h-[1.5px] bg-[#789D74] rounded-full transition-all duration-500 ease-out pointer-events-none ${
-                                goal.completed ? 'w-full opacity-90' : 'w-0 opacity-0'
+                                isCompletedOrCompleting ? 'w-full opacity-90' : 'w-0 opacity-0'
                               }`}
                             />
                           </div>
@@ -173,14 +197,14 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                           <div className="mt-1">
                             <span
                               className={`inline-flex items-center whitespace-nowrap text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                                goal.completed
+                                isCompletedOrCompleting
                                   ? 'bg-[#789D74]/15 text-[#789D74] border-[#789D74]/30'
                                   : days.isOverdue
                                   ? 'bg-red-500/15 text-red-400 border-red-500/30'
                                   : 'bg-[#CC6543]/15 text-[#E59B80] border-[#CC6543]/30'
                               }`}
                             >
-                              {goal.completed ? 'Completed' : days.label}
+                              {isCompletedOrCompleting ? 'Completed' : days.label}
                             </span>
                           </div>
                         </div>
@@ -211,7 +235,10 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
 
         {/* Fullscreen Button */}
         <button
-          onClick={onToggleFullscreen}
+          onClick={(e) => {
+            (e.currentTarget as HTMLElement).blur();
+            onToggleFullscreen();
+          }}
           className="p-2 sm:p-2.5 rounded-2xl bg-[#22201D]/80 hover:bg-[#2E2B26] text-[#A8A297] hover:text-[#F5F2EB] border border-[#33302B] hover:border-[#4D4740] active:scale-95 transition-all duration-200"
           title={isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'}
         >
@@ -252,7 +279,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
             </div>
 
             {/* Modal Goal List */}
-            {closestGoals.length === 0 ? (
+            {homeGoals.length === 0 ? (
               <div className="py-8 text-center text-xs text-[#8A857D]">
                 <p>No goals set yet.</p>
                 {onGoToGoals && (
@@ -270,28 +297,29 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
               </div>
             ) : (
               <div className="space-y-3">
-                {closestGoals.map((goal) => {
+                {homeGoals.map((goal) => {
                   const days = formatDaysRemaining(goal.target_date);
+                  const isCompletedOrCompleting = goal.completed || completingGoalIds.has(goal.id);
                   return (
                     <div
                       key={goal.id}
-                      className={`p-3.5 rounded-2xl border transition-all duration-700 flex items-start gap-3 ${
-                        goal.completed
-                          ? 'bg-[#1C1B18]/70 border-[#2B2824] opacity-45'
-                          : 'bg-[#252320] border-[#383530]'
+                      className={`p-3.5 rounded-2xl border transition-all duration-500 flex items-start gap-3 ${
+                        isCompletedOrCompleting
+                          ? 'bg-[#1C1B18]/70 border-[#2B2824] opacity-0 scale-95 pointer-events-none'
+                          : 'bg-[#252320] border-[#383530] opacity-100 scale-100'
                       }`}
                     >
                       {/* Circle Tickbox (Green when Checked) */}
                       <button
                         type="button"
-                        onClick={() => onToggleGoal && onToggleGoal(goal.id)}
+                        onClick={() => handleToggleGoal(goal.id)}
                         className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 cursor-pointer active:scale-90 ${
-                          goal.completed
+                          isCompletedOrCompleting
                             ? 'bg-[#789D74] border-2 border-[#789D74] text-white shadow-md shadow-[#789D74]/30'
                             : 'border-2 border-[#555048] hover:border-[#789D74] bg-transparent'
                         }`}
                       >
-                        {goal.completed && (
+                        {isCompletedOrCompleting && (
                           <Check className="w-3.5 h-3.5 stroke-[3] animate-pop-in" />
                         )}
                       </button>
@@ -300,7 +328,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                         <div className="relative inline-block max-w-full">
                           <span
                             className={`text-sm font-semibold block truncate transition-colors duration-500 ${
-                              goal.completed ? 'text-[#8A8477]' : 'text-[#F5F2EB]'
+                              isCompletedOrCompleting ? 'text-[#8A8477]' : 'text-[#F5F2EB]'
                             }`}
                           >
                             {goal.title}
@@ -308,7 +336,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                           {/* Animated Strikethrough Line */}
                           <span
                             className={`absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-[#789D74] rounded-full transition-all duration-500 ease-out pointer-events-none ${
-                              goal.completed ? 'w-full opacity-90' : 'w-0 opacity-0'
+                              isCompletedOrCompleting ? 'w-full opacity-90' : 'w-0 opacity-0'
                             }`}
                           />
                         </div>
@@ -316,14 +344,14 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({
                         <div className="mt-1.5">
                           <span
                             className={`inline-flex items-center whitespace-nowrap text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                              goal.completed
+                              isCompletedOrCompleting
                                 ? 'bg-[#789D74]/15 text-[#789D74] border-[#789D74]/30'
                                 : days.isOverdue
                                 ? 'bg-red-500/15 text-red-400 border-red-500/30'
                                 : 'bg-[#CC6543]/15 text-[#E59B80] border-[#CC6543]/30'
                             }`}
                           >
-                            {goal.completed ? 'Completed' : days.label}
+                            {isCompletedOrCompleting ? 'Completed' : days.label}
                           </span>
                         </div>
                       </div>

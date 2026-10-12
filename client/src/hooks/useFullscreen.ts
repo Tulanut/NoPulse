@@ -4,10 +4,23 @@ export function useFullscreen() {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(
     typeof document !== 'undefined' ? !!document.fullscreenElement : false
   );
+  const [showFullscreenHint, setShowFullscreenHint] = useState(false);
 
   useEffect(() => {
+    let timer: number | null = null;
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const active = !!document.fullscreenElement;
+      setIsFullscreen(active);
+      if (active) {
+        setShowFullscreenHint(true);
+        if (timer) clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          setShowFullscreenHint(false);
+        }, 1400);
+      } else {
+        setShowFullscreenHint(false);
+        if (timer) clearTimeout(timer);
+      }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -16,6 +29,7 @@ export function useFullscreen() {
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
     return () => {
+      if (timer) clearTimeout(timer);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
@@ -25,6 +39,11 @@ export function useFullscreen() {
 
   const toggleFullscreen = useCallback(async () => {
     try {
+      // Blur active element to dismiss browser hover tooltip immediately
+      if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+
       if (!document.fullscreenElement) {
         const elem = document.documentElement as any;
         if (elem.requestFullscreen) {
@@ -48,5 +67,5 @@ export function useFullscreen() {
     }
   }, []);
 
-  return { isFullscreen, toggleFullscreen };
+  return { isFullscreen, toggleFullscreen, showFullscreenHint };
 }

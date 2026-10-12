@@ -53,7 +53,7 @@ export const App: React.FC = () => {
     deleteGoal,
   } = useGoals();
 
-  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const { isFullscreen, toggleFullscreen, showFullscreenHint } = useFullscreen();
 
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('landing');
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
@@ -113,6 +113,15 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#191816] text-[#F5F2EB] flex flex-col font-sans selection:bg-[#CC6543] selection:text-white relative">
+      {/* Sleek Auto-Dismissing Fullscreen Mode Indicator (1.4s) */}
+      {showFullscreenHint && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none animate-slide-up">
+          <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#1A1816]/95 border border-[#383530] text-[#F5F2EB] text-xs shadow-2xl backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full bg-[#CC6543] animate-pulse" />
+            <span className="font-medium">Full screen mode · Press Esc to exit</span>
+          </div>
+        </div>
+      )}
       {/* =========================================================================
           GLOBAL VIEWPORT-LOCKED TOAST (Screen Center on Mobile / Top-Right on Laptop)
           Zero screen blur, 100% visible regardless of page scroll position
@@ -179,8 +188,8 @@ export const App: React.FC = () => {
           currentScreen === 'landing'
             ? 'flex flex-col justify-center py-6'
             : navPosition === 'side'
-            ? 'pt-16 pb-24 sm:pt-8 sm:pb-16 sm:pl-28'
-            : 'pt-16 pb-24 sm:pt-24 sm:pb-16'
+            ? 'pt-6 pb-16 pl-20 sm:pl-28 sm:pt-8'
+            : 'pt-28 pb-16 sm:pt-24 sm:pb-16'
         }`}
       >
         {/* Offline Banner if Offline */}
@@ -292,7 +301,7 @@ export const App: React.FC = () => {
       {currentScreen !== 'landing' && (
         <footer
           className={`border-t border-claude-border bg-[#191816] py-4 px-4 text-center text-xs text-claude-textDim animate-fade-in transition-all duration-300 ${
-            navPosition === 'side' ? 'sm:pl-28' : ''
+            navPosition === 'side' ? 'pl-20 sm:pl-28' : ''
           }`}
         >
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">

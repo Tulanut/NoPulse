@@ -228,8 +228,8 @@ export const useGoals = () => {
     today.setHours(0, 0, 0, 0);
     const todayMs = today.getTime();
 
-    // Prefer active goals; fallback to all goals if none active
-    const pool = activeGoals.length > 0 ? activeGoals : goals.filter((g) => g.is_deleted !== 1);
+    // Home screen ONLY shows active (uncompleted) goals. Completed goals do not appear here.
+    const pool = activeGoals;
 
     return [...pool]
       .sort((a, b) => {
@@ -240,7 +240,7 @@ export const useGoals = () => {
         return diffA - diffB;
       })
       .slice(0, 3);
-  }, [activeGoals, goals]);
+  }, [activeGoals]);
 
   return {
     goals,

@@ -154,10 +154,147 @@ export const Header: React.FC<HeaderProps> = ({
   // 1. DEDICATED RESPONSIVE MOBILE NAVIGATION (< 640px)
   // =========================================================================
   if (isMobile) {
+    if (navPosition === 'side') {
+      return (
+        <aside className="fixed top-0 bottom-0 left-0 z-50 w-16 bg-[#1A1816]/98 backdrop-blur-2xl border-r border-[#2E2B26]/90 py-3.5 px-1 flex flex-col justify-between items-center shadow-2xl shadow-black/80">
+          {/* Brand Logo Button */}
+          <button
+            onClick={() => onNavigate('landing')}
+            className="flex flex-col items-center gap-1 active:scale-95 transition-all text-center"
+            title="NoPulse Home"
+          >
+            <div className="w-8 h-8 rounded-xl bg-[#CC6543] flex items-center justify-center shadow-md shadow-[#CC6543]/20 ring-1 ring-white/10">
+              <Dumbbell className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-[10px] font-bold text-[#F5F2EB] tracking-tight">NoPulse</span>
+          </button>
+
+          {/* Center Navigation Buttons */}
+          <nav className="flex flex-col items-center gap-1.5 w-full bg-[#22201D] border border-[#33302B] p-1 rounded-2xl">
+            <button
+              onClick={() => onNavigate('landing')}
+              className={`flex flex-col items-center justify-center gap-0.5 w-full py-2 rounded-xl text-[9px] active:scale-95 transition-all ${
+                currentScreen === 'landing'
+                  ? 'bg-[#2E2B26] text-[#F5F2EB] font-bold border border-[#44403A]'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB]'
+              }`}
+              title="Home"
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>Home</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('log')}
+              className={`flex flex-col items-center justify-center gap-0.5 w-full py-2 rounded-xl text-[9px] active:scale-95 transition-all ${
+                currentScreen === 'log'
+                  ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/25'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB]'
+              }`}
+              title="Add Log"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Log</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('exercises')}
+              className={`flex flex-col items-center justify-center gap-0.5 w-full py-2 rounded-xl text-[9px] active:scale-95 transition-all ${
+                currentScreen === 'exercises' || currentScreen === 'exercise-detail'
+                  ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/25'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB]'
+              }`}
+              title="Exercises"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Ex</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('goals')}
+              className={`flex flex-col items-center justify-center gap-0.5 w-full py-2 rounded-xl text-[9px] active:scale-95 transition-all ${
+                currentScreen === 'goals'
+                  ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/25'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB]'
+              }`}
+              title="Goals"
+            >
+              <Target className="w-3.5 h-3.5" />
+              <span>Goals</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('profile')}
+              className={`flex flex-col items-center justify-center gap-0.5 w-full py-2 rounded-xl text-[9px] active:scale-95 transition-all ${
+                currentScreen === 'profile'
+                  ? 'bg-[#CC6543] text-white font-bold shadow-md shadow-[#CC6543]/25'
+                  : 'text-[#A8A297] hover:text-[#F5F2EB]'
+              }`}
+              title="Profile"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Profile</span>
+            </button>
+          </nav>
+
+          {/* Bottom Actions & Switch */}
+          <div className="flex flex-col items-center gap-2 w-full">
+            {/* Position Switch button on mobile side rail */}
+            <button
+              onClick={onToggleNavPosition}
+              className="p-1.5 rounded-xl bg-[#22201D] text-[#A8A297] hover:text-[#CC6543] border border-[#33302B] active:scale-90 transition-all"
+              title="Switch to Top Navigation"
+            >
+              <PanelTop className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Sync Button */}
+            <button
+              onClick={onManualSync}
+              disabled={syncState === 'syncing' || !isOnline}
+              className="p-1.5 rounded-xl bg-[#22201D] border border-[#33302B] text-[#A8A297] hover:text-[#F5F2EB] active:scale-90 transition disabled:opacity-40"
+              title={lastSyncedAt ? `Last Synced: ${formatTime(lastSyncedAt)}` : 'Sync Database'}
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${
+                  syncState === 'syncing' ? 'animate-spin text-[#CC6543]' : ''
+                }`}
+              />
+            </button>
+
+            {/* Fullscreen Button */}
+            <button
+              onClick={(e) => {
+                (e.currentTarget as HTMLElement).blur();
+                onToggleFullscreen();
+              }}
+              className="p-1.5 rounded-xl bg-[#22201D] border border-[#33302B] text-[#A8A297] hover:text-[#F5F2EB] active:scale-90 transition"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {/* Online dot */}
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isOnline ? 'bg-[#789D74]' : 'bg-[#E08E45]'
+              }`}
+              title={isOnline ? 'Online' : 'Offline'}
+            />
+          </div>
+        </aside>
+      );
+    }
+
+    // Default Mobile: Top Navigation Header with Nav Pills
     return (
-      <>
-        {/* Compact Mobile Top Header */}
-        <header className="fixed top-0 left-0 right-0 z-40 bg-[#1A1816]/95 backdrop-blur-xl border-b border-[#2E2B26]/80 px-4 py-2.5 flex items-center justify-between shadow-lg shadow-black/40">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#1A1816]/98 backdrop-blur-2xl border-b border-[#2E2B26]/90 px-3 py-2 flex flex-col gap-2 shadow-xl shadow-black/40">
+        {/* Row 1: Brand & Utilities */}
+        <div className="flex items-center justify-between">
           <button
             onClick={() => onNavigate('landing')}
             className="flex items-center gap-2 active:scale-95 transition-all text-left"
@@ -170,7 +307,16 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {/* Position switch to Side Rail */}
+            <button
+              onClick={onToggleNavPosition}
+              className="p-1.5 rounded-lg bg-[#22201D] border border-[#33302B] text-[#A8A297] hover:text-[#CC6543] active:scale-90 transition"
+              title="Switch to Side Rail"
+            >
+              <PanelLeft className="w-3.5 h-3.5" />
+            </button>
+
             {pendingSyncCount > 0 && (
               <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-[#CC6543]/15 text-[#E59B80] border border-[#CC6543]/30 font-semibold animate-pop-in">
                 <AlertCircle className="w-3 h-3" />
@@ -192,7 +338,10 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button
-              onClick={onToggleFullscreen}
+              onClick={(e) => {
+                (e.currentTarget as HTMLElement).blur();
+                onToggleFullscreen();
+              }}
               className="p-1.5 rounded-lg bg-[#22201D] border border-[#33302B] text-[#A8A297] hover:text-[#F5F2EB] active:scale-90 transition"
               title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
             >
@@ -210,71 +359,71 @@ export const Header: React.FC<HeaderProps> = ({
               title={isOnline ? 'Online' : 'Offline'}
             />
           </div>
-        </header>
+        </div>
 
-        {/* Fixed Mobile Bottom Navigation Bar */}
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#1A1816]/98 backdrop-blur-2xl border-t border-[#2E2B26]/90 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-2xl shadow-black/80">
+        {/* Row 2: Navigation Pills */}
+        <nav className="flex items-center justify-between gap-1 w-full bg-[#22201D] border border-[#33302B] p-1 rounded-xl">
           <button
             onClick={() => onNavigate('landing')}
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] active:scale-95 transition-all ${
               currentScreen === 'landing'
-                ? 'text-[#CC6543] font-bold'
+                ? 'bg-[#2E2B26] text-[#F5F2EB] font-bold border border-[#44403A]'
                 : 'text-[#A8A297] hover:text-[#F5F2EB]'
             }`}
           >
-            <Home className="w-4 h-4" />
+            <Home className="w-3 h-3" />
             <span>Home</span>
           </button>
 
           <button
             onClick={() => onNavigate('log')}
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] active:scale-95 transition-all ${
               currentScreen === 'log'
-                ? 'text-[#CC6543] font-bold'
+                ? 'bg-[#CC6543] text-white font-bold shadow-sm'
                 : 'text-[#A8A297] hover:text-[#F5F2EB]'
             }`}
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Add Log</span>
+            <PlusCircle className="w-3 h-3" />
+            <span>Log</span>
           </button>
 
           <button
             onClick={() => onNavigate('exercises')}
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] active:scale-95 transition-all ${
               currentScreen === 'exercises' || currentScreen === 'exercise-detail'
-                ? 'text-[#CC6543] font-bold'
+                ? 'bg-[#CC6543] text-white font-bold shadow-sm'
                 : 'text-[#A8A297] hover:text-[#F5F2EB]'
             }`}
           >
-            <Layers className="w-4 h-4" />
+            <Layers className="w-3 h-3" />
             <span>Exercises</span>
           </button>
 
           <button
             onClick={() => onNavigate('goals')}
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] active:scale-95 transition-all ${
               currentScreen === 'goals'
-                ? 'text-[#CC6543] font-bold'
+                ? 'bg-[#CC6543] text-white font-bold shadow-sm'
                 : 'text-[#A8A297] hover:text-[#F5F2EB]'
             }`}
           >
-            <Target className="w-4 h-4" />
+            <Target className="w-3 h-3" />
             <span>Goals</span>
           </button>
 
           <button
             onClick={() => onNavigate('profile')}
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl text-[10px] active:scale-95 transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] active:scale-95 transition-all ${
               currentScreen === 'profile'
-                ? 'text-[#CC6543] font-bold'
+                ? 'bg-[#CC6543] text-white font-bold shadow-sm'
                 : 'text-[#A8A297] hover:text-[#F5F2EB]'
             }`}
           >
-            <User className="w-4 h-4" />
+            <User className="w-3 h-3" />
             <span>Profile</span>
           </button>
         </nav>
-      </>
+      </header>
     );
   }
 
@@ -445,7 +594,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Fullscreen Button */}
             <button
-              onClick={onToggleFullscreen}
+              onClick={(e) => {
+                (e.currentTarget as HTMLElement).blur();
+                onToggleFullscreen();
+              }}
               className="p-2 rounded-xl bg-[#22201D] hover:bg-[#2E2B26] text-[#A8A297] hover:text-[#F5F2EB] border border-[#33302B] active:scale-95 transition-all"
               title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
             >
@@ -636,7 +788,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Fullscreen Button */}
             <button
-              onClick={onToggleFullscreen}
+              onClick={(e) => {
+                (e.currentTarget as HTMLElement).blur();
+                onToggleFullscreen();
+              }}
               className="p-1.5 rounded-xl bg-[#22201D] hover:bg-[#2E2B26] text-[#A8A297] hover:text-[#F5F2EB] border border-[#33302B] active:scale-95 transition-all duration-200"
               title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
             >
