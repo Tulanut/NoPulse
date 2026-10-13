@@ -136,3 +136,396 @@
 .animate-quote-swap {
   animation: quoteSwap 320ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* =========================================================================
+   ODYSSEUS THEME (Refined: Warm Orangey Dark Nav + Warm Cream Body + Soft Gray Divs)
+   - Navigation Bar: Warm orangey-charcoal (#221a15), tray (#1a130f), dark borders (#3a2c23)
+   - Main Body Canvas: Warm creamy linen (#f3eee5) - shows subtle warm color, lighter than divs
+   - Cards / Divs: Gentle warm light gray (#eae5dc) - soothing, zero glare / eye piercing
+   - Borders: Soft warm stone (#d8d1c2) - NO harsh white borders anywhere
+   - Typography: Fira Code monospace dev aesthetic
+   - Text: Deep warm charcoal (#221c17) on cards, warm ivory (#fff8f2) in nav
+   - Primary Accent: Odysseus crimson / terracotta (#c24a42)
+   - Pressed buttons: Tactile warm gray (#55514b) with translateY(1px)
+   ========================================================================= */
+
+html.theme-odysseus,
+body.theme-odysseus,
+.theme-odysseus,
+.theme-odysseus button,
+.theme-odysseus input,
+.theme-odysseus select,
+.theme-odysseus textarea,
+.theme-odysseus h1,
+.theme-odysseus h2,
+.theme-odysseus h3,
+.theme-odysseus h4,
+.theme-odysseus h5,
+.theme-odysseus h6,
+.theme-odysseus p,
+.theme-odysseus span,
+.theme-odysseus a {
+  font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}
+
+body.theme-odysseus,
+.theme-odysseus {
+  background-color: #f3eee5 !important;
+  color: #221c17 !important;
+}
+
+/* =========================================================================
+   1. WARM ORANGEY-DARK NAVIGATION BAR (Header & Aside Side Rail)
+   ========================================================================= */
+.theme-odysseus header,
+.theme-odysseus aside {
+  background-color: #221a15 !important;
+  border-color: #3a2c23 !important;
+  color: #fff8f2 !important;
+  box-shadow: 0 4px 24px -2px rgba(20, 14, 10, 0.45) !important;
+}
+
+/* Outer Border of Nav Bar */
+.theme-odysseus header.border-b,
+.theme-odysseus aside.border-r {
+  border-color: #3a2c23 !important;
+}
+
+/* Nav Pills Wrapper Tray inside Header & Aside */
+.theme-odysseus header nav,
+.theme-odysseus aside nav {
+  background-color: #1a130f !important;
+  border-color: #3a2c23 !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Scoped Overrides: Ensure NO white borders exist inside Header & Aside */
+.theme-odysseus header *,
+.theme-odysseus aside * {
+  border-color: #3a2c23 !important;
+}
+
+/* Brand, Titles & Headings in Navigation Bar */
+.theme-odysseus header h1,
+.theme-odysseus header span,
+.theme-odysseus aside span {
+  color: #fff8f2 !important;
+}
+
+/* Inactive Nav Links / Buttons in Navigation Bar */
+.theme-odysseus header nav button,
+.theme-odysseus aside nav button {
+  color: #b09f93 !important;
+  border-color: transparent !important;
+}
+
+.theme-odysseus header nav button:hover,
+.theme-odysseus aside nav button:hover {
+  color: #fff8f2 !important;
+  background-color: rgba(204, 101, 67, 0.15) !important;
+}
+
+/* Active Nav Button in Header / Aside */
+.theme-odysseus header nav button[class*="bg-[#CC6543]"],
+.theme-odysseus aside nav button[class*="bg-[#CC6543]"] {
+  background-color: #c24a42 !important;
+  border-color: #c24a42 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 10px rgba(194, 74, 66, 0.4) !important;
+}
+
+/* Active Home / Subtle Button in Header */
+.theme-odysseus header nav button[class*="bg-[#2E2B26]"],
+.theme-odysseus aside nav button[class*="bg-[#2E2B26]"] {
+  background-color: #33251e !important;
+  border-color: #4a362a !important;
+  color: #fff8f2 !important;
+}
+
+/* Utility Buttons in Navigation (Offline Pill, Sync, Fullscreen, Position Switch) */
+.theme-odysseus header button[class*="bg-[#22201D]"],
+.theme-odysseus aside button[class*="bg-[#22201D]"],
+.theme-odysseus header div[class*="bg-[#22201D]"],
+.theme-odysseus aside div[class*="bg-[#22201D]"] {
+  background-color: #2a1f18 !important;
+  border-color: #3d2d23 !important;
+  color: #b09f93 !important;
+}
+
+.theme-odysseus header button[class*="bg-[#22201D]"]:hover,
+.theme-odysseus aside button[class*="bg-[#22201D]"]:hover {
+  color: #fff8f2 !important;
+  border-color: #553e30 !important;
+  background-color: #33261e !important;
+}
+
+/* Auto-hide Pull Tab */
+.theme-odysseus .fixed > div > div[class*="bg-[#201E1B]"] {
+  background-color: #221a15 !important;
+  border-color: #3a2c23 !important;
+  color: #b09f93 !important;
+}
+
+.theme-odysseus .fixed > div > div[class*="bg-[#201E1B]"]:hover {
+  color: #fff8f2 !important;
+  border-color: #553e30 !important;
+}
+
+/* Offline Banner if Offline */
+.theme-odysseus [class*="from-[#E08E45]"] {
+  background: #eae5dc !important;
+  border-color: #d8d1c2 !important;
+  color: #9c5516 !important;
+}
+
+/* =========================================================================
+   2. MAIN BODY CANVAS & EYE-COMFORT LIGHT GRAY DIVS / SURFACES
+   ========================================================================= */
+
+/* Main Canvas Background: Warm Creamy Linen (#f3eee5) */
+.theme-odysseus .bg-\[\#191816\],
+.theme-odysseus .bg-claude-bg {
+  background-color: #f3eee5 !important;
+  color: #221c17 !important;
+}
+
+/* Each Div / Card / Surface: Warm Soothing Light Gray (#eae5dc) */
+.theme-odysseus main div[class*="bg-[#252320]"],
+.theme-odysseus main div[class*="bg-claude-surface"],
+.theme-odysseus .bg-\[\#252320\],
+.theme-odysseus .bg-\[\#252320\]\/80,
+.theme-odysseus .bg-\[\#252320\]\/90,
+.theme-odysseus .bg-claude-surface {
+  background-color: #eae5dc !important;
+  border-color: #d8d1c2 !important;
+  color: #221c17 !important;
+  box-shadow: 0 1px 3px 0 rgba(40, 30, 20, 0.04), 0 1px 2px -1px rgba(40, 30, 20, 0.03);
+}
+
+/* Modals, Dropdowns, Popups, Overlays (Outside Header) */
+.theme-odysseus :not(header):not(aside) > div[class*="bg-[#1E1D1A]"],
+.theme-odysseus :not(header):not(aside) > div[class*="bg-[#1C1A17]"],
+.theme-odysseus :not(header):not(aside) > div[class*="bg-[#201E1B]"],
+.theme-odysseus :not(header):not(aside) > div[class*="bg-[#22201D]"],
+.theme-odysseus [role="dialog"],
+.theme-odysseus .modal-content {
+  background-color: #ebe7df !important;
+  border-color: #d8d1c2 !important;
+  color: #221c17 !important;
+  box-shadow: 0 10px 25px -5px rgba(40, 30, 20, 0.08), 0 8px 10px -6px rgba(40, 30, 20, 0.04);
+}
+
+/* Secondary Surfaces, Chips, Pills & Nested Containers */
+.theme-odysseus :not(header):not(aside) .bg-\[\#2E2B26\],
+.theme-odysseus :not(header):not(aside) .bg-\[\#2E2B27\],
+.theme-odysseus :not(header):not(aside) .bg-\[\#36332E\],
+.theme-odysseus :not(header):not(aside) .bg-claude-surfaceActive {
+  background-color: #ded8cc !important;
+  border-color: #cdc6b7 !important;
+  color: #221c17 !important;
+}
+
+/* Hover States on Card Surfaces */
+.theme-odysseus :not(header):not(aside) .hover\:bg-\[\#2E2B27\]:hover,
+.theme-odysseus :not(header):not(aside) .hover\:bg-\[\#2E2B26\]\/50:hover,
+.theme-odysseus :not(header):not(aside) .hover\:bg-\[\#2E2B26\]\/60:hover,
+.theme-odysseus :not(header):not(aside) .hover\:bg-claude-surfaceHover:hover {
+  background-color: #e0dad0 !important;
+}
+
+/* Borders on Cards & Content (Warm Stone - NO White Borders!) */
+.theme-odysseus :not(header):not(aside) .border-\[\#383530\],
+.theme-odysseus :not(header):not(aside) .border-\[\#383530\]\/50,
+.theme-odysseus :not(header):not(aside) .border-\[\#383530\]\/60,
+.theme-odysseus :not(header):not(aside) .border-\[\#383530\]\/80,
+.theme-odysseus :not(header):not(aside) .border-\[\#2E2B26\],
+.theme-odysseus :not(header):not(aside) .border-\[\#2E2B26\]\/80,
+.theme-odysseus :not(header):not(aside) .border-\[\#2E2B26\]\/90,
+.theme-odysseus :not(header):not(aside) .border-\[\#33302B\],
+.theme-odysseus :not(header):not(aside) .border-\[\#44403A\],
+.theme-odysseus :not(header):not(aside) .border-\[\#4D4740\],
+.theme-odysseus :not(header):not(aside) .border-claude-border,
+.theme-odysseus :not(header):not(aside) .border-claude-borderSubtle,
+.theme-odysseus :not(header):not(aside) .border-claude-borderHover {
+  border-color: #d8d1c2 !important;
+}
+
+/* Text Colors on Cards & Content */
+.theme-odysseus :not(header):not(aside) .text-\[\#F5F2EB\],
+.theme-odysseus :not(header):not(aside) .text-claude-text {
+  color: #221c17 !important;
+}
+
+.theme-odysseus :not(header):not(aside) .text-\[\#A8A297\],
+.theme-odysseus :not(header):not(aside) .text-\[\#8A8477\],
+.theme-odysseus :not(header):not(aside) .text-\[\#C8C2B7\],
+.theme-odysseus :not(header):not(aside) .text-claude-textMuted {
+  color: #635b52 !important;
+}
+
+.theme-odysseus :not(header):not(aside) .text-\[\#706B62\],
+.theme-odysseus :not(header):not(aside) .text-\[\#555048\],
+.theme-odysseus :not(header):not(aside) .text-claude-textDim {
+  color: #8a8176 !important;
+}
+
+/* White Text Inversion: on cards, convert standalone text-white to deep charcoal */
+.theme-odysseus main span.text-white:not([class*="bg-"]),
+.theme-odysseus main p.text-white:not([class*="bg-"]),
+.theme-odysseus main h1.text-white,
+.theme-odysseus main h2.text-white,
+.theme-odysseus main h3.text-white {
+  color: #221c17 !important;
+}
+
+/* =========================================================================
+   3. PRIMARY ACCENTS, BUTTONS & FORM CONTROLS
+   ========================================================================= */
+
+/* Primary Accent: Terracotta / Crimson (#c24a42) */
+.theme-odysseus .text-\[\#CC6543\],
+.theme-odysseus .text-claude-terracotta {
+  color: #c24a42 !important;
+}
+
+.theme-odysseus .bg-\[\#CC6543\],
+.theme-odysseus .bg-claude-terracotta {
+  background-color: #c24a42 !important;
+  border-color: #c24a42 !important;
+  color: #ffffff !important;
+}
+
+.theme-odysseus .border-\[\#CC6543\],
+.theme-odysseus .border-claude-terracotta {
+  border-color: #c24a42 !important;
+}
+
+.theme-odysseus .hover\:bg-\[\#DE7C5A\]:hover {
+  background-color: #ad3d36 !important;
+}
+
+/* Soft Accent Badges */
+.theme-odysseus .bg-\[\#CC6543\]\/15,
+.theme-odysseus .bg-\[\#CC6543\]\/10,
+.theme-odysseus .bg-\[\#CC6543\]\/20,
+.theme-odysseus .bg-\[\#CC6543\]\/5 {
+  background-color: rgba(194, 74, 66, 0.08) !important;
+  border-color: rgba(194, 74, 66, 0.25) !important;
+  color: #c24a42 !important;
+}
+
+/* Status Colors */
+.theme-odysseus .text-\[\#789D74\] {
+  color: #3b7a37 !important;
+}
+
+.theme-odysseus .bg-\[\#789D74\] {
+  background-color: #4a8c45 !important;
+  color: #ffffff !important;
+}
+
+.theme-odysseus .bg-\[\#789D74\]\/15,
+.theme-odysseus .bg-\[\#789D74\]\/20 {
+  background-color: rgba(74, 140, 69, 0.1) !important;
+  border-color: rgba(74, 140, 69, 0.3) !important;
+  color: #3b7a37 !important;
+}
+
+.theme-odysseus .text-\[\#E08E45\] {
+  color: #b8681d !important;
+}
+
+.theme-odysseus .bg-\[\#E08E45\]\/15 {
+  background-color: rgba(224, 142, 69, 0.1) !important;
+  border-color: rgba(224, 142, 69, 0.3) !important;
+  color: #b8681d !important;
+}
+
+.theme-odysseus .text-\[\#D45B5B\] {
+  color: #c92a2a !important;
+}
+
+.theme-odysseus .bg-\[\#D45B5B\]\/15 {
+  background-color: rgba(201, 42, 42, 0.1) !important;
+  border-color: rgba(201, 42, 42, 0.3) !important;
+  color: #c92a2a !important;
+}
+
+/* Maintain White Text on Filled Colored Elements */
+.theme-odysseus .bg-\[\#CC6543\] .text-white,
+.theme-odysseus .bg-\[\#CC6543\].text-white,
+.theme-odysseus .bg-\[\#789D74\] .text-white,
+.theme-odysseus .bg-\[\#789D74\].text-white,
+.theme-odysseus .bg-claude-terracotta .text-white,
+.theme-odysseus button[class*="bg-[#CC6543]"],
+.theme-odysseus button[class*="bg-[#CC6543]"] *,
+.theme-odysseus button[class*="bg-[#789D74]"],
+.theme-odysseus button[class*="bg-[#789D74]"] * {
+  color: #ffffff !important;
+}
+
+/* Buttons & Pressed State */
+.theme-odysseus button:active:not([class*="bg-[#CC6543]"]):not([class*="bg-[#789D74]"]),
+.theme-odysseus [role="button"]:active:not([class*="bg-[#CC6543]"]) {
+  background-color: #55514b !important;
+  color: #ffffff !important;
+  border-color: #55514b !important;
+  transform: translateY(1px);
+}
+
+.theme-odysseus button[class*="bg-[#CC6543]"]:active {
+  background-color: #96342e !important;
+  color: #ffffff !important;
+  transform: translateY(1px);
+}
+
+/* Inputs, Textareas, Selects */
+.theme-odysseus input,
+.theme-odysseus textarea,
+.theme-odysseus select {
+  background-color: #ece7de !important;
+  color: #221c17 !important;
+  border-color: #d5cebe !important;
+}
+
+.theme-odysseus input:focus,
+.theme-odysseus textarea:focus,
+.theme-odysseus select:focus {
+  border-color: #c24a42 !important;
+  outline-color: #c24a42 !important;
+  box-shadow: 0 0 0 2px rgba(194, 74, 66, 0.15) !important;
+}
+
+.theme-odysseus input::placeholder,
+.theme-odysseus textarea::placeholder {
+  color: #8a8176 !important;
+}
+
+/* Minimal Footer */
+.theme-odysseus footer {
+  background-color: #eae5dc !important;
+  border-color: #d8d1c2 !important;
+  color: #635b52 !important;
+}
+
+/* Scrollbars */
+.theme-odysseus ::-webkit-scrollbar-track {
+  background: #ded8cc !important;
+}
+
+.theme-odysseus ::-webkit-scrollbar-thumb {
+  background: #c7bfae !important;
+  border-radius: 9999px;
+}
+
+.theme-odysseus ::-webkit-scrollbar-thumb:hover {
+  background: #b5ac9b !important;
+}
+
+/* Selection Highlight */
+.theme-odysseus ::selection {
+  background-color: #c24a42 !important;
+  color: #ffffff !important;
+}
+
+

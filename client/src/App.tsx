@@ -81,6 +81,21 @@ export const App: React.FC = () => {
     return (localStorage.getItem('nopulse_nav_position') as NavPosition) || 'top';
   });
 
+  // Color Theme: 'obsidian' | 'odysseus' (Stored locally)
+  const [theme, setTheme] = useState<'obsidian' | 'odysseus'>(() => {
+    return (localStorage.getItem('nopulse_theme') as 'obsidian' | 'odysseus') || 'obsidian';
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('nopulse_theme', theme);
+    const isOdysseus = theme === 'odysseus';
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('theme-odysseus', isOdysseus);
+      document.body.classList.toggle('theme-odysseus', isOdysseus);
+      document.body.style.backgroundColor = isOdysseus ? '#f3eee5' : '#191816';
+    }
+  }, [theme]);
+
   const toggleNavPosition = () => {
     setNavPosition((prev) => {
       const next = prev === 'top' ? 'side' : 'top';
@@ -112,7 +127,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#191816] text-[#F5F2EB] flex flex-col font-sans selection:bg-[#CC6543] selection:text-white relative">
+    <div className={`min-h-screen bg-[#191816] text-[#F5F2EB] flex flex-col font-sans selection:bg-[#CC6543] selection:text-white relative ${theme === 'odysseus' ? 'theme-odysseus' : ''}`}>
       {/* Sleek Auto-Dismissing Fullscreen Mode Indicator (1.4s) */}
       {showFullscreenHint && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none animate-slide-up">
@@ -278,6 +293,8 @@ export const App: React.FC = () => {
               onImportWorkouts={importWorkouts}
               navPosition={navPosition}
               onToggleNavPosition={toggleNavPosition}
+              currentTheme={theme}
+              onSelectTheme={setTheme}
               onBackToHome={handleGoHome}
             />
           )}

@@ -23,6 +23,7 @@ import {
   Target,
   Upload,
   AlertCircle,
+  Palette,
 } from 'lucide-react';
 import { Workout } from '../types/workout';
 import { UserProfileData, UserSocials } from '../types/user';
@@ -55,6 +56,8 @@ interface UserProfileViewProps {
   ) => Promise<number>;
   navPosition?: NavPosition;
   onToggleNavPosition?: () => void;
+  currentTheme?: 'obsidian' | 'odysseus';
+  onSelectTheme?: (theme: 'obsidian' | 'odysseus') => void;
   onBackToHome: () => void;
 }
 
@@ -99,6 +102,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   onImportWorkouts,
   navPosition = 'top',
   onToggleNavPosition,
+  currentTheme = 'obsidian',
+  onSelectTheme,
 }) => {
   // CSV Import State
   const [isImporting, setIsImporting] = useState<boolean>(false);
@@ -985,6 +990,97 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                 <PanelLeft className="w-4 h-4" />
                 <span>Side Rail</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 4B: COLOR THEME PREFERENCE (Odysseus AI vs Obsidian Dark) */}
+      {onSelectTheme && (
+        <div className="space-y-4">
+          <div className="border-b border-[#383530]/60 pb-3">
+            <div className="flex items-center gap-2">
+              <Palette className="w-4 h-4 text-[#CC6543]" />
+              <h2 className="text-lg font-bold text-[#F5F2EB] uppercase tracking-wider">
+                Appearance & Theme
+              </h2>
+            </div>
+            <p className="text-xs text-[#A8A297] mt-0.5">
+              Choose your visual theme aesthetic.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* 1. Obsidian Dark Option */}
+            <div
+              onClick={() => onSelectTheme('obsidian')}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between gap-4 ${
+                currentTheme === 'obsidian'
+                  ? 'bg-[#1E1D1A] border-[#CC6543] ring-1 ring-[#CC6543]/40 shadow-lg shadow-black/40'
+                  : 'bg-[#252320]/80 border-[#383530] hover:border-[#4D4740] hover:bg-[#2E2B27]/60'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#191816] border border-[#383530]" />
+                    <span className="text-sm font-bold text-[#F5F2EB]">
+                      Obsidian Dark
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#A8A297] mt-1">
+                    Warm charcoal canvas, Cormorant Garamond serif headings, and Claude aesthetic.
+                  </p>
+                </div>
+                {currentTheme === 'obsidian' && (
+                  <span className="w-5 h-5 rounded-full bg-[#CC6543] text-white flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 pt-2 border-t border-[#383530]/40 text-[10px] text-[#706B62]">
+                <span className="px-2 py-0.5 rounded bg-[#191816] text-[#A8A297] font-mono border border-[#383530]/60">#191816</span>
+                <span className="px-2 py-0.5 rounded bg-[#252320] text-[#A8A297] font-mono border border-[#383530]/60">#252320</span>
+                <span className="px-2 py-0.5 rounded bg-[#CC6543]/20 text-[#CC6543] font-mono border border-[#CC6543]/30">#CC6543</span>
+              </div>
+            </div>
+
+            {/* 2. Odysseus Theme Option */}
+            <div
+              onClick={() => onSelectTheme('odysseus')}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between gap-4 ${
+                currentTheme === 'odysseus'
+                  ? 'bg-[#1E1D1A] border-[#CC6543] ring-1 ring-[#CC6543]/40 shadow-lg shadow-black/40'
+                  : 'bg-[#252320]/80 border-[#383530] hover:border-[#4D4740] hover:bg-[#2E2B27]/60'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#221a15] border border-[#3a2c23]" />
+                    <span className="text-sm font-bold text-[#F5F2EB]">
+                      Odysseus Theme
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#CC6543]/15 text-[#CC6543] font-mono uppercase font-semibold">
+                      odysseusai.dev
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#A8A297] mt-1">
+                    Warm orangey-dark navigation bar, warm creamy body, eye-comfort light gray cards, and crimson accents.
+                  </p>
+                </div>
+                {currentTheme === 'odysseus' && (
+                  <span className="w-5 h-5 rounded-full bg-[#CC6543] text-white flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 pt-2 border-t border-[#383530]/40 text-[10px] text-[#706B62]">
+                <span className="px-2 py-0.5 rounded bg-[#221a15] text-[#fff8f2] font-mono border border-[#3a2c23]">nav #221a15</span>
+                <span className="px-2 py-0.5 rounded bg-[#f3eee5] text-[#221c17] font-mono border border-[#d8d1c2]">body #f3eee5</span>
+                <span className="px-2 py-0.5 rounded bg-[#eae5dc] text-[#221c17] font-mono border border-[#d8d1c2]">div #eae5dc</span>
+                <span className="px-2 py-0.5 rounded bg-[#c24a42]/15 text-[#c24a42] font-mono border border-[#c24a42]/30">#c24a42</span>
+              </div>
             </div>
           </div>
         </div>
